@@ -1,31 +1,31 @@
+from storage import StorageManager, File, Tier
+from simpy.core import Environment
+
 
 class Policy:
-    def __init__(self, storage, env=None):
+    def __init__(self, storage: StorageManager, env: Environment):
         self.storage = storage
-        if env is not None:
-            self.env = env
-        else:
-            self.env = storage.env
+        self.env = env
 
-        for event_name, callback in [("on_file_created_event", self.on_file_created),
-                                     ("on_file_access_event", self.on_file_access),
-                                     ("on_disk_occupation_increase_event", self.on_disk_occupation_increase)]:
+        for event, callback in [(storage.on_file_created_event, self.on_file_created),
+                                (storage.on_file_access_event, self.on_file_access),
+                                (storage.on_disk_occupation_increase_event, self.on_disk_occupation_increase)]:
             self.env.process(self._storage_event_listener(target=storage,
-                                                          event_name=event_name,
+                                                          event=event,
                                                           callback=callback))
 
     @staticmethod
-    def _storage_event_listener(target, event_name, callback):
+    def _storage_event_listener(target, event, callback):
         while True:
-            event = getattr(target, event_name)
-            yield event
-            callback(*event.value)
+            e = event[0]
+            yield e
+            callback(*e.value)
 
-    def on_file_created(self, path, id, tier_id, size, ctime, last_mod, last_access):
+    def on_file_created(self, file: File, tier: Tier):
         pass
 
-    def on_file_access(self, path, id, tier_id, size, ctime, last_mod, last_access, is_write):
+    def on_file_access(self, file: File, tier: Tier, is_write: bool):
         pass
 
-    def on_disk_occupation_increase(self, path, id, tier_id, size, ctime, last_mod, last_access, prev_size):
+    def on_disk_occupation_increase(self, tier: Tier):
         pass
