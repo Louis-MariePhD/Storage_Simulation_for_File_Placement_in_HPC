@@ -1,15 +1,16 @@
 import simpy
+from simpy.core import Environment
+from trace import Trace
+from storage import StorageManager
+from policies.policy import Policy
 
 
 class Simulation:
-    def __init__(self, traces, storage, policy, env = None):
-        if env is not None:
-            self._env = env
-        else:
-            self._env = simpy.Environment()
+    def __init__(self, traces: Trace, storage: StorageManager, policy: Policy, env: Environment):
+        self._env = env
         self._policy = policy
         self._storage = storage
-        self._stats = [[0, 0.0, 0, 0.0] for _ in storage.tier_sizes] # n_write, t_write, n_reads, t_reads
+        self._stats = [[0, 0.0, 0, 0.0] for _ in storage.tiers] # n_write, t_write, n_reads, t_reads
 
         # Adding traces to env as processes
         for trace in traces:
@@ -19,10 +20,11 @@ class Simulation:
         self._env.run()
         print("Simulation end! Printing results:")
         for i in range(len(self._stats)):
-            tier_occupation = sum([metadata[0] for metadata in self._storage.tier_contents_metadata[i]])
-            print(f'Tier "{self._storage.tier_names[i]}" of size {self._storage.tier_sizes[i] / (2 ** (10 * 30))} Gio'
-                  f' ({tier_occupation} octets / {round(tier_occupation/(2**(10*2)), 3)} Mio used): {self._stats[i][0]}'
-                  f' write ({round(self._stats[i][1], 6)} seconds), {self._stats[i][2]} reads ('
+            tier = self._storage.tiers[i]
+            tier_occupation = sum([file.size for file in tier.content.values()])
+            print(f'Tier "{tier.name}" of size {tier.size / (2 ** (10 * 30))} Gio'
+                  f' ({tier_occupation} octets aka {round(tier_occupation/(2**(10*2)), 3)} Mio used)'
+                  f': {self._stats[i][0]} write ({round(self._stats[i][1], 6)} seconds), {self._stats[i][2]} reads ('
                   f'{round(self._stats[i][3], 6)} seconds)')
 
     def register_callback(self, event_name, callback):
@@ -31,7 +33,7 @@ class Simulation:
     def fire_event(self, event_name, value):
         pass
 
-    def _read_trace(self, trace):
+    def _read_trace(self, trace: Trace):
         last_ts = 0
         # read a line
         for line in trace.data:
@@ -42,14 +44,22 @@ class Simulation:
 
     def _read_line(self, line):
         path, rank, tstart, tend, offset, count, is_read, segments = line
+
         # yield tstart
         # Lock resources (if necessary)
 
         # Updating the storage. It will create a new file if it's the 1st time we see this path
-        file = [self._storage.sim_write, self._storage.sim_read][is_read](tstart, tend, path, offset, count)
+        file = self._storage.get_file(path)
+        time_taken = 0. # Time taken by this io, computed by the tier class
+        if file is None:
+            tier = self._storage.get_default_tier()
+            time_taken += tier.create_file(tstart, path)
+        else:
+            tier = file.tier
+        time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
 
         # incrementing stats
-        path, id, tier_id, size, ctime, last_mod, last_access = file
+        tier_id = self._storage.tiers.index(tier)
         self._stats[tier_id][int(is_read) * 2] += 1
         self._stats[tier_id][int(is_read) * 2 + 1] += tend - tstart
 
@@ -59,16 +69,18 @@ class Simulation:
 
 if __name__ == "__main__":
     from traces import PARADIS_HDF5
-    from storage import StorageManager
+    from storage import Tier
     from policies.demo_policy import DemoPolicy
-    from trace import Trace
     import sys
 
     with open("logs/last_run.log", 'w') as output:
         sys.stdout = output
-        traces = [Trace(PARADIS_HDF5)]
         env = simpy.Environment()
-        storage = StorageManager(env, tier_sizes=[256 * 2 ** (10 * 30), 2000 * 2 ** (10 * 30), 10000 * 2 ** (10 * 30)], tier_names=["SSD", "HDD", "Tapes"])
+        traces = [Trace(PARADIS_HDF5)]
+        storage = StorageManager(env)
+        tier_ssd = Tier(storage, 'SSD', 256 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
+        tier_hdd = Tier(storage, 'HDD', 2000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
+        tier_tapes = Tier(storage, 'Tapes', 10000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         policy = DemoPolicy(storage, env)
         sim = Simulation(traces, storage, policy, env)
         sim.run()

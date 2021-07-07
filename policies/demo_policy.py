@@ -1,15 +1,16 @@
 from policies.policy import Policy
+from storage import File, Tier
 
 
 class DemoPolicy(Policy):
     def __init__(self, storage, env=None):
         Policy.__init__(self, storage, env)
 
-    def on_file_created(self, path, id, tier_id, size, ctime, last_mod, last_access):
-        print(f'File {path} was created in tier {self.storage.tier_names[tier_id]}')
+    def on_file_created(self, file: File, tier: Tier):
+        print(f'File {file.path} was created in tier {tier.name}')
 
-    def on_file_access(self, path, id, tier_id, size, ctime, last_mod, last_access, is_write):
-        print(f'There was a {["read", "write"][is_write]} in file {path} in tier {self.storage.tier_names[tier_id]}')
+    def on_file_access(self, file: File, tier: Tier, is_write: bool):
+        print(f'There was a {["read", "write"][is_write]} in file {file.path} in tier {tier.name}')
 
-    def on_disk_occupation_increase(self, path, id, tier_id, size, ctime, last_mod, last_access, prev_size):
-        print(f'A write in file {path} informed us of an occupation increase in tier {self.storage.tier_names[tier_id]}')
+    def on_disk_occupation_increase(self, tier: Tier):
+        print(f'We were notified of a tier occupation increase in tier {tier.name}')
