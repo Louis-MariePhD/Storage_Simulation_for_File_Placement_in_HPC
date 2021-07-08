@@ -22,7 +22,7 @@ class Simulation:
         for i in range(len(self._stats)):
             tier = self._storage.tiers[i]
             tier_occupation = sum([file.size for file in tier.content.values()])
-            print(f'Tier "{tier.name}" of size {tier.size / (2 ** (10 * 30))} Gio'
+            print(f'Tier "{tier.name}" of size {tier.max_size / (2 ** (10 * 30))} Gio'
                   f' ({tier_occupation} octets aka {round(tier_occupation/(2**(10*2)), 3)} Mio used)'
                   f': {self._stats[i][0]} write ({round(self._stats[i][1], 6)} seconds), {self._stats[i][2]} reads ('
                   f'{round(self._stats[i][3], 6)} seconds)')
@@ -73,14 +73,20 @@ if __name__ == "__main__":
     from policies.demo_policy import DemoPolicy
     import sys
 
-    with open("logs/last_run.log", 'w') as output:
+    log_file = "logs/last_run.txt"
+    with open(log_file, 'w') as output:
+        print(f'sys.stdout redirected to "./{log_file}".')
+        backup_stdout = sys.stdout
         sys.stdout = output
         env = simpy.Environment()
         traces = [Trace(PARADIS_HDF5)]
-        storage = StorageManager(env)
-        tier_ssd = Tier(storage, 'SSD', 256 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
-        tier_hdd = Tier(storage, 'HDD', 2000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
-        tier_tapes = Tier(storage, 'Tapes', 10000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
-        policy = DemoPolicy(storage, env)
+        tier_ssd = Tier('SSD', 256 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
+        tier_hdd = Tier('HDD', 2000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
+        tier_tapes = Tier('Tapes', 10000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
+        storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
+        policy = DemoPolicy(tier_ssd, storage, env)
+        policy = DemoPolicy(tier_hdd, storage, env)
         sim = Simulation(traces, storage, policy, env)
         sim.run()
+        sys.stdout = backup_stdout
+        print(f'Done! Check the above-mentioned log file for more details.')
