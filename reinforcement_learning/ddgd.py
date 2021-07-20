@@ -4,16 +4,21 @@ import torch.optim as optim
 from torch.autograd import Variable
 from reinforcement_learning.replay_memory import Memory
 
-"""
-Deep Deterministic Gradient Descent
-Composed of: an Actor network that generate an action-value from a continuous action space
-             a Critic network that is basically a Q-Network
-It is well described there (https://spinningup.openai.com/en/latest/algorithms/ddpg.html) and
-there (https://towardsdatascience.com/deep-deterministic-policy-gradients-explained-2d94655a9b7b)
-"""
-
 
 class DDGD:
+    """
+    Deep Deterministic Gradient Descent is composed of:
+        - an Actor network that generate an action-value from a continuous action space
+        - a Critic network that is basically a Q-Function
+
+    It is well described there (https://spinningup.openai.com/en/latest/algorithms/ddpg.html) and
+    there (https://towardsdatascience.com/deep-deterministic-policy-gradients-explained-2d94655a9b7b)
+
+    It is made to work with episodes and states changes strongly correlated to the action taken. If we use DDGD
+    for regression purpose, the 'action' will not directly influence the transition from one state to another.
+    In such cases, Using gamma=0 would be sensible.
+    """
+
     def __init__(self, actor, actor_target, critic, critic_target,
                  actor_learning_rate=1e-4,
                  critic_learning_rate=1e-3,

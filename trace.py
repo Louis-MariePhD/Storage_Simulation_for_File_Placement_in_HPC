@@ -4,6 +4,7 @@ import sys
 
 _DEBUG = False
 
+
 class Trace:
 
     # Column names extracted from recorder_viz, kept here as static members vars
