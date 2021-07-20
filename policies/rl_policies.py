@@ -65,11 +65,13 @@ class DDGD_LRU_LO_Policy(Policy):
 
     TODO:
         - We could update the lifetime prediction daily. We would then be able to add last_access-creation_time,
-          last_mod-creation_time etc to the input of the regression model. At creation time, theses values are always 0.
+          last_mod-creation_time etc to the input of the regression model. At creation time, theses values are always 0,
+          that's why we have not used these meaningful metadata yet. We would need a 'real' trace though.
         - Adding last_access etc to the input of the regression model would enable us to handle the case of files going
           up in the tier, and becoming active again a long time after the end of their lifetime.
         - Separate file creation and file arriving in the tier. It's not the same! One occurs once, the other can occurs
-          multiple times
+          multiple times. Same for file deletion / file migration.
+        - Create a good ol' DQN version
     """
     def __init__(self, tier: Tier, storage: StorageManager, env: Environment, evaluation_period=60*60*24,
                  evaluate_as_inactive_after=7*24*3600):
