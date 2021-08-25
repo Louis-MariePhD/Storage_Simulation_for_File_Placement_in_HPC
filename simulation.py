@@ -43,7 +43,9 @@ class Simulation:
             self._read_line(line)
 
     def _read_line(self, line):
-        path, rank, tstart, tend, offset, count, is_read, segments = line
+        # path, rank, tstart, tend, offset, count, is_read, segments = line
+        file_id, tstart, class_size, return_size = line
+        path = str(file_id)
 
         # yield tstart
         # Lock resources (if necessary)
@@ -51,9 +53,11 @@ class Simulation:
         # Updating the storage. It will create a new file if it's the 1st time we see this path
         file = self._storage.get_file(path)
         time_taken = 0. # Time taken by this io, computed by the tier class
+        is_read = True
         if file is None:
             tier = self._storage.get_default_tier()
             time_taken += tier.create_file(tstart, path)
+            is_read = False
         else:
             tier = file.tier
         time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
@@ -61,7 +65,7 @@ class Simulation:
         # incrementing stats
         tier_id = self._storage.tiers.index(tier)
         self._stats[tier_id][int(is_read) * 2] += 1
-        self._stats[tier_id][int(is_read) * 2 + 1] += tend - tstart
+        #self._stats[tier_id][int(is_read) * 2 + 1] += tend - tstart
 
         # yield tend
         # Unlock resources (not necessary either?)
@@ -77,7 +81,7 @@ if __name__ == "__main__":
     with open(log_file, 'w') as output:
         print(f'sys.stdout redirected to "./{log_file}".')
         backup_stdout = sys.stdout
-        sys.stdout = output
+        #sys.stdout = output
         env = simpy.Environment()
         traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
         #traces = [Trace(PARADIS_HDF5)]
