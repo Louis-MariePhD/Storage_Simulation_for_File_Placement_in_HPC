@@ -123,6 +123,7 @@ class DDGD_LRU_LO_Policy(Policy):
         self.lru_file_list.remove(file)
 
         # LO Policy
+        # FIXME We lose tracking on migrated files?
         data = self.prediction_data.pop(file)
         self.regression_agent.memory.push(state=data["state"],
                                           action=data["prediction"],

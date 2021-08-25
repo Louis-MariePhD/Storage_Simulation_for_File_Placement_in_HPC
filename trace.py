@@ -25,7 +25,7 @@ class Trace:
 
         self.data = []
         file_count = 0
-        file_ids_occurences = {}
+        self.self.file_ids_occurences = {}
         # loading dataset
         with open(trace_path) as f:
             print(
@@ -36,18 +36,18 @@ class Trace:
                 timestamp = int(datetime.datetime.strptime(
                     columns[0], "%Y%m%d%H%M%S").timestamp())
                 file_id = columns[1]
-                if file_id not in file_ids_occurences:
-                    file_ids_occurences[file_id] = [1, timestamp]
+                if file_id not in self.file_ids_occurences:
+                    self.file_ids_occurences[file_id] = [1, timestamp]
                 else:
-                    file_ids_occurences[file_id][0] += 1
-                    file_ids_occurences[file_id].append(timestamp)
+                    self.file_ids_occurences[file_id][0] += 1
+                    self.file_ids_occurences[file_id].append(timestamp)
                 class_size = Trace._CHAR2SIZE[columns[3]]  # size of the file (approximation)
                 # number of bytes returned by the request
                 return_size = columns[4]
                 self.data += [[file_id, timestamp, class_size, return_size]]
                 line = f.readline()
             print(f'[trace-reader] Done loading trace "{trace_path}", for a total of {len(self.data)} '
-                  f'read/writes operations, on {len(file_ids_occurences)} uniques file names.')
+                  f'read/writes operations, on {len(self.file_ids_occurences)} uniques file names.')
 
     # def __init__(self, trace_path, trace_name="Unnamed trace folder"):
     #     """
@@ -107,10 +107,3 @@ class Trace:
         :return: The columns corresponding to the data
         """
         return Trace._COLUMN_NAMES
-
-
-if __name__ == "__main__":
-    from traces import VPIC_PATH_UNI
-    _DEBUG = True
-    trace = Trace(VPIC_PATH_UNI)
-    print(trace.get_data()[:10])
