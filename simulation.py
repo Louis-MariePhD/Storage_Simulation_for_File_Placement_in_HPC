@@ -3,7 +3,9 @@ from simpy.core import Environment
 from trace import Trace
 from storage import StorageManager
 from policies.policy import Policy
-
+from tqdm import tqdm
+import os
+import pickle
 
 class Simulation:
     def __init__(self, traces: list[Trace], storage: StorageManager, env: Environment):
@@ -35,12 +37,14 @@ class Simulation:
     def _read_trace(self, trace: Trace):
         last_ts = 0
         # read a line
-        for line in trace.data:
-            #tstart = line[2]
-            tstart = line[1] 
-            yield self._env.timeout(max(0, tstart - last_ts)) # traces are sorted by tstart order.
-            last_ts = tstart
-            self._read_line(line)
+        with tqdm(total=len(trace.data)) as pbar:
+            for line in trace.data:
+                pbar.update(1)
+                #tstart = line[2]
+                tstart = line[1] 
+                yield self._env.timeout(max(0, tstart - last_ts)) # traces are sorted by tstart order.
+                last_ts = tstart
+                self._read_line(line)
 
     def _read_line(self, line):
         # path, rank, tstart, tend, offset, count, is_read, segments = line
@@ -84,12 +88,21 @@ if __name__ == "__main__":
         backup_stdout = sys.stdout
         #sys.stdout = output
         env = simpy.Environment()
-        traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
+        if os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle') :
+            with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'rb') as f:
+                traces = [pickle.load(f)]
+        else:
+            traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
+            print('loading with pickle')
+            with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'wb') as f:
+                pickle.dump(traces[0], f)
+            print('file loaded with pickle')
+
         print('done loading trace')
         #traces = [Trace(PARADIS_HDF5)]
-        tier_ssd = Tier('SSD', 256 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
-        tier_hdd = Tier('HDD', 2000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
-        tier_tapes = Tier('Tapes', 10000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
+        tier_ssd = Tier('SSD', 10 * 10 ** 9, 'unknown latency', 'unknown throughput')
+        tier_hdd = Tier('HDD', 500 * 10 ** 9, 'unknown latency', 'unknown throughput')
+        tier_tapes = Tier('Tapes', 100 * 10 ** 12, 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
         #policy_tier_sdd = DemoPolicy(tier_ssd, storage, env)
         #policy_tier_hdd = DemoPolicy(tier_hdd, storage, env)

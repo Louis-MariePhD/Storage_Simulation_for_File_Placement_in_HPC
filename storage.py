@@ -22,7 +22,7 @@ class File:
 
 class Tier:
     def __init__(self, name: str, max_size: int, latency: float, throughput: float,
-                 target_occupation: float = 0.8):
+                 target_occupation: float = 0.9):
         """
         TODO: increment used size
         TODO: returns real delays
@@ -50,11 +50,15 @@ class Tier:
         """
         return 0
 
-    def create_file(self, timestamp, path, size : int = 0):
+    def create_file(self, timestamp, path, size : int = 0, file : File = None):
         """
         :return: time in seconds until operation completion
         """
-        file = File(path, self.manager.get_default_tier(), size=size, ctime=timestamp, last_mod=timestamp, last_access=timestamp)
+        if file is None :
+            file = File(path, self, size=size, ctime=timestamp, last_mod=timestamp, last_access=timestamp)
+        else:
+            # assert file.path not in self.content.keys() # not supposed to happen with our policies
+            file = File(file.path, self, file.size, file.creation_time, file.last_modification, file.last_access)
         self.used_size += file.size
         self.content[path]=file
         self.manager.fire_event(self.manager.on_file_created_event, self, (file,))  # file, tier
@@ -72,20 +76,22 @@ class Tier:
         """
         :return: time in seconds until operation completion
         """
-        self.content[path].last_access = timestamp
-        self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], False))  # file, tier, is_write
+        if path in self.content.keys():
+            self.content[path].last_access = timestamp
+            self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], False))  # file, tier, is_write
         return 0
 
     def write_file(self, timestamp, path):
         """
         :return: time in seconds until operation completion
         """
-        self.content[path].last_access = timestamp
-        self.content[path].last_mod = timestamp
-        self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], True))  # file, tier, is_write
-        #if self.used_size >= self.max_size*self.target_occupation:
-        #    self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())\
-        # TODO: update file size, add offset as arg
+        if path in self.content.keys():
+            self.content[path].last_access = timestamp
+            self.content[path].last_mod = timestamp
+            self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], True))  # file, tier, is_write
+            #if self.used_size >= self.max_size*self.target_occupation:
+            #    self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())\
+            # TODO: update file size, add offset as arg
         return 0
 
     def close_file(self):
@@ -98,8 +104,10 @@ class Tier:
         """
         :return: time in seconds until operation completion
         """
-        file = self.content.remove(path)
-        self.manager.fire_event(self.manager.on_file_deleted_event, self, (file,))  # file, tier
+        if path in self.content.keys():
+            file = self.content.pop(path)
+            self.used_size -= file.size
+            self.manager.fire_event(self.manager.on_file_deleted_event, self, (file,))  # file, tier
         return 0
 
 
@@ -140,7 +148,7 @@ class StorageManager:
         return None
 
     @staticmethod
-    def migrate(file: File, target_tier: Tier):
+    def migrate(file: File, target_tier: Tier, timestamp):
         """
         :return: The time needed until completion of the migration
         """
@@ -150,8 +158,8 @@ class StorageManager:
 
         # TODO: find migration delay from a paper
         delay = 0.
-        delay += target_tier.create_file()
-        delay += max(file.tier.read_file(), target_tier.write_file())
-        delay += file.tier.delete_file()
+        delay += target_tier.create_file(timestamp, file.path, file=file)
+        delay += max(file.tier.read_file(timestamp, file.path), target_tier.write_file(timestamp, file.path))
+        delay += file.tier.delete_file(file.path)
 
         return delay
