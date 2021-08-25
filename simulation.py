@@ -50,6 +50,7 @@ class Simulation:
         # path, rank, tstart, tend, offset, count, is_read, segments = line
         file_id, tstart, class_size, return_size = line
         path = str(file_id)
+        print(f'{path} read from the trace')
 
         # yield tstart
         # Lock resources (if necessary)
@@ -64,7 +65,7 @@ class Simulation:
             is_read = False
         else:
             tier = file.tier
-        time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
+            time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
 
         # incrementing stats
         tier_id = self._storage.tiers.index(tier)
@@ -105,12 +106,10 @@ if __name__ == "__main__":
         tier_hdd = Tier('HDD', 500 * 10 ** 9, 'unknown latency', 'unknown throughput')
         tier_tapes = Tier('Tapes', 100 * 10 ** 12, 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
-        #policy_tier_sdd = DemoPolicy(tier_ssd, storage, env)
-        #policy_tier_hdd = DemoPolicy(tier_hdd, storage, env)
-        policy_tier_sdd = LRU_LifetimeOverunPolicy(tier_ssd, storage, env,
-                                                   prediction_model=lambda path: traces[0].file_ids_occurences[path])
-        policy_tier_hdd = LRU_LifetimeOverunPolicy(tier_hdd, storage, env,
-                                                   prediction_model=lambda path: traces[0].file_ids_occurences[path])
+        policy_tier_sdd = LRUPolicy(tier_ssd, storage, env)
+        policy_tier_hdd = LRUPolicy(tier_hdd, storage, env)
+        #policy_tier_sdd = LRU_LifetimeOverunPolicy(tier_ssd, storage, env, prediction_model=lambda path: traces[0].file_ids_occurences[path])
+        #policy_tier_hdd = LRU_LifetimeOverunPolicy(tier_hdd, storage, env, prediction_model=lambda path: traces[0].file_ids_occurences[path])
         sim = Simulation(traces, storage, env)
         sim.run()
         sys.stdout = backup_stdout
