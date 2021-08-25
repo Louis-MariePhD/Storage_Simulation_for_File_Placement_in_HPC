@@ -2,6 +2,8 @@ from os import environ
 from simpy.core import Environment
 from typing import List
 
+from policies.policy import Policy
+
 
 class File:
     def __init__(self, path: str, tier: "Tier", size: int, ctime: float, last_mod: float, last_access: float):
@@ -41,6 +43,10 @@ class Tier:
         self.target_occupation = target_occupation
         self.content = dict()  # key: path, value: File
         self.manager = None
+        self.listeners = []
+
+    def register_listener(self, listener : Policy):
+        self.listeners += [listener]
 
     def has_file(self, path):
         return path in self.content.keys()
@@ -62,9 +68,10 @@ class Tier:
             file = File(file.path, self, file.size, file.creation_time, file.last_modification, file.last_access)
         self.used_size += file.size
         self.content[path]=file
-        self.manager.fire_event(self.manager.on_file_created_event, self, (file,), event_priority)  # file, tier
-        if self.used_size >= self.max_size*self.target_occupation:
-            self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, (), event_priority)
+        for listener in self.listeners:
+            listener.on_file_created_event(file)
+            if self.used_size >= self.max_size*self.target_occupation:
+                listener.on_tier_nearly_full_event()
         return 0
 
     def open_file(self):
@@ -78,18 +85,22 @@ class Tier:
         :return: time in seconds until operation completion
         """
         if path in self.content.keys():
-            self.content[path].last_access = timestamp
-            self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], False), event_priority)  # file, tier, is_write
-        return 0
+            file = self.content[path]
+            file.last_access = timestamp
+            for listener in self.listeners:
+                listener.on_file_accessed_event(file, False)
+            return 0
 
     def write_file(self, timestamp, path, event_priority=0):
         """
         :return: time in seconds until operation completion
         """
         if path in self.content.keys():
-            self.content[path].last_access = timestamp
-            self.content[path].last_mod = timestamp
-            self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], True), event_priority)  # file, tier, is_write
+            file = self.content[path]
+            file.last_access = timestamp
+            file.last_mod = timestamp
+            for listener in self.listeners:
+                listener.on_file_accessed_event(file, True)
             #if self.used_size >= self.max_size*self.target_occupation:
             #    self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())\
             # TODO: update file size, add offset as arg
@@ -108,7 +119,8 @@ class Tier:
         if path in self.content.keys():
             file = self.content.pop(path)
             self.used_size -= file.size
-            self.manager.fire_event(self.manager.on_file_deleted_event, self, (file,), event_priority)  # file, tier
+            for listener in self.listeners:
+                listener.on_file_deleted_event(file)
         return 0
 
 
@@ -129,12 +141,6 @@ class StorageManager:
 
         for tier in tiers:
             tier.manager = self  # association linking
-
-    def fire_event(self, event, tier, value=(), event_priority=0):
-        e = event[-1]
-        event += [self._env.event()]
-        e.succeed((tier, *value))
-        #self._env.process(self.delay(event_priority*1e-10, lambda: e.succeed((tier, *value))))
 
     def delay(self, timeout, cb):
         yield self._env.timeout(timeout)
