@@ -6,9 +6,8 @@ from policies.policy import Policy
 
 
 class Simulation:
-    def __init__(self, traces: Trace, storage: StorageManager, policy: Policy, env: Environment):
+    def __init__(self, traces: list[Trace], storage: StorageManager, env: Environment):
         self._env = env
-        self._policy = policy
         self._storage = storage
         self._stats = [[0, 0.0, 0, 0.0] for _ in storage.tiers] # n_write, t_write, n_reads, t_reads
 
@@ -37,7 +36,8 @@ class Simulation:
         last_ts = 0
         # read a line
         for line in trace.data:
-            tstart = line[2]
+            #tstart = line[2]
+            tstart = line[1] 
             yield self._env.timeout(max(0, tstart - last_ts)) # traces are sorted by tstart order.
             last_ts = tstart
             self._read_line(line)
@@ -68,7 +68,7 @@ class Simulation:
 
 
 if __name__ == "__main__":
-    from traces import PARADIS_HDF5
+    from traces import PARADIS_HDF5, TENCENT_DATASET_FILE_THREAD1
     from storage import Tier
     from policies.demo_policy import DemoPolicy
     import sys
@@ -79,14 +79,15 @@ if __name__ == "__main__":
         backup_stdout = sys.stdout
         sys.stdout = output
         env = simpy.Environment()
-        traces = [Trace(PARADIS_HDF5)]
+        traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
+        #traces = [Trace(PARADIS_HDF5)]
         tier_ssd = Tier('SSD', 256 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         tier_hdd = Tier('HDD', 2000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         tier_tapes = Tier('Tapes', 10000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
-        policy = DemoPolicy(tier_ssd, storage, env)
-        policy = DemoPolicy(tier_hdd, storage, env)
-        sim = Simulation(traces, storage, policy, env)
+        policy_tier_sdd = DemoPolicy(tier_ssd, storage, env)
+        policy_tier_hdd = DemoPolicy(tier_hdd, storage, env)
+        sim = Simulation(traces, storage, env)
         sim.run()
         sys.stdout = backup_stdout
         print(f'Done! Check the above-mentioned log file for more details.')

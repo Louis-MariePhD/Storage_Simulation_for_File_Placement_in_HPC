@@ -1,1 +1,4 @@
 *pycache__
+venv/
+.vscode/
+traces/dataset_*
