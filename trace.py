@@ -5,36 +5,49 @@ import datetime
 
 _DEBUG = False
 
+
 class Trace:
 
     # Column names extracted from recorder_viz, kept here as static members vars
-    _COLUMN_NAMES = ("path", "rank", "tstart", "tend", "offset", "count", "isRead", "segments")
+    _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
+                     "offset", "count", "isRead", "segments")
     _TENCENT_DATASET_COLUMN_NAMES = ("timestamp", "")
 
-    def __init__(self, trace_path : str, trace_type : int = 0):
+    _CHAR2SIZE = {
+        'l': 33136,
+        'a': 3263749,
+        'o': 4925317,
+        'm': 6043467,
+        'c': 6050183,
+        'b': 8387821}
+
+    def __init__(self, trace_path: str, trace_type: int = 0):
 
         self.data = []
         file_count = 0
         file_ids_occurences = {}
         # loading dataset
         with open(trace_path) as f:
-            print(f'[trace-reader] Started loading traces from data folder "{trace_path}" into memory')
+            print(
+                f'[trace-reader] Started loading traces from data folder "{trace_path}" into memory')
             line = f.readline()
             while len(line) != 0:
                 columns = line.split(' ')
-                timestamp = int(datetime.datetime.strptime(columns[0], "%Y%m%d%H%M%S").timestamp())
+                timestamp = int(datetime.datetime.strptime(
+                    columns[0], "%Y%m%d%H%M%S").timestamp())
                 file_id = columns[1]
                 if file_id not in file_ids_occurences:
                     file_ids_occurences[file_id] = [1, timestamp]
                 else:
                     file_ids_occurences[file_id][0] += 1
                     file_ids_occurences[file_id].append(timestamp)
-                class_size = columns[3] # size of the file (approximation)
-                return_size = columns[4] # number of bytes returned by the request
+                class_size = Trace._CHAR2SIZE[columns[3]]  # size of the file (approximation)
+                # number of bytes returned by the request
+                return_size = columns[4]
                 self.data += [[file_id, timestamp, class_size, return_size]]
                 line = f.readline()
             print(f'[trace-reader] Done loading trace "{trace_path}", for a total of {len(self.data)} '
-                f'read/writes operations, on {len(file_ids_occurences)} uniques file names.')
+                  f'read/writes operations, on {len(file_ids_occurences)} uniques file names.')
 
     # def __init__(self, trace_path, trace_name="Unnamed trace folder"):
     #     """

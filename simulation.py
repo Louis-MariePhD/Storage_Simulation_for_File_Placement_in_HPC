@@ -56,7 +56,7 @@ class Simulation:
         is_read = True
         if file is None:
             tier = self._storage.get_default_tier()
-            time_taken += tier.create_file(tstart, path)
+            time_taken += tier.create_file(tstart, path, class_size)
             is_read = False
         else:
             tier = file.tier
@@ -75,6 +75,7 @@ if __name__ == "__main__":
     from traces import PARADIS_HDF5, TENCENT_DATASET_FILE_THREAD1
     from storage import Tier
     from policies.demo_policy import DemoPolicy
+    from policies.lru_policy import LRUPolicy
     import sys
 
     log_file = "logs/last_run.txt"
@@ -84,13 +85,16 @@ if __name__ == "__main__":
         #sys.stdout = output
         env = simpy.Environment()
         traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
+        print('done loading trace')
         #traces = [Trace(PARADIS_HDF5)]
         tier_ssd = Tier('SSD', 256 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         tier_hdd = Tier('HDD', 2000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         tier_tapes = Tier('Tapes', 10000 * 2 ** (10 * 30), 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
-        policy_tier_sdd = DemoPolicy(tier_ssd, storage, env)
-        policy_tier_hdd = DemoPolicy(tier_hdd, storage, env)
+        #policy_tier_sdd = DemoPolicy(tier_ssd, storage, env)
+        #policy_tier_hdd = DemoPolicy(tier_hdd, storage, env)
+        policy_tier_sdd = LRUPolicy(tier_ssd, storage, env)
+        policy_tier_hdd = LRUPolicy(tier_hdd, storage, env)
         sim = Simulation(traces, storage, env)
         sim.run()
         sys.stdout = backup_stdout

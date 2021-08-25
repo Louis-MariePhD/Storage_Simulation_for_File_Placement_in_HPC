@@ -50,13 +50,16 @@ class Tier:
         """
         return 0
 
-    def create_file(self, timestamp, path):
+    def create_file(self, timestamp, path, size : int = 0):
         """
         :return: time in seconds until operation completion
         """
-        file = File(path, self.manager.get_default_tier(), size=0, ctime=timestamp, last_mod=timestamp, last_access=timestamp)
+        file = File(path, self.manager.get_default_tier(), size=size, ctime=timestamp, last_mod=timestamp, last_access=timestamp)
+        self.used_size += file.size
         self.content[path]=file
         self.manager.fire_event(self.manager.on_file_created_event, self, (file,))  # file, tier
+        if self.used_size >= self.max_size*self.target_occupation:
+            self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())
         return 0
 
     def open_file(self):
@@ -69,6 +72,7 @@ class Tier:
         """
         :return: time in seconds until operation completion
         """
+        self.content[path].last_access = timestamp
         self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], False))  # file, tier, is_write
         return 0
 
@@ -76,9 +80,12 @@ class Tier:
         """
         :return: time in seconds until operation completion
         """
+        self.content[path].last_access = timestamp
+        self.content[path].last_mod = timestamp
         self.manager.fire_event(self.manager.on_file_access_event, self, (self.content[path], True))  # file, tier, is_write
-        if self.used_size >= self.max_size*self.target_occupation:
-            self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())
+        #if self.used_size >= self.max_size*self.target_occupation:
+        #    self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())\
+        # TODO: update file size, add offset as arg
         return 0
 
     def close_file(self):
