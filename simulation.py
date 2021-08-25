@@ -80,6 +80,7 @@ if __name__ == "__main__":
     from storage import Tier
     from policies.demo_policy import DemoPolicy
     from policies.lru_policy import LRUPolicy
+    from policies.lifetime_overun_policy import LRU_LifetimeOverunPolicy
     import sys
 
     log_file = "logs/last_run.txt"
@@ -106,8 +107,10 @@ if __name__ == "__main__":
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
         #policy_tier_sdd = DemoPolicy(tier_ssd, storage, env)
         #policy_tier_hdd = DemoPolicy(tier_hdd, storage, env)
-        policy_tier_sdd = LRUPolicy(tier_ssd, storage, env)
-        policy_tier_hdd = LRUPolicy(tier_hdd, storage, env)
+        policy_tier_sdd = LRU_LifetimeOverunPolicy(tier_ssd, storage, env,
+                                                   prediction_model=lambda path: traces[0].file_ids_occurences[path])
+        policy_tier_hdd = LRU_LifetimeOverunPolicy(tier_hdd, storage, env,
+                                                   prediction_model=lambda path: traces[0].file_ids_occurences[path])
         sim = Simulation(traces, storage, env)
         sim.run()
         sys.stdout = backup_stdout
