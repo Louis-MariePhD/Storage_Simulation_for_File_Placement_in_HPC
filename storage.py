@@ -1,3 +1,4 @@
+from os import environ
 from simpy.core import Environment
 from typing import List
 
@@ -130,12 +131,13 @@ class StorageManager:
             tier.manager = self  # association linking
 
     def fire_event(self, event, tier, value=(), event_priority=0):
-        e = event[0]
-        event[0] = self._env.event()
-        self._env.process(self.delay(event_priority*1e-10, lambda: e.succeed((tier, *value))))
+        e = event[-1]
+        event += [self._env.event()]
+        e.succeed((tier, *value))
+        #self._env.process(self.delay(event_priority*1e-10, lambda: e.succeed((tier, *value))))
 
     def delay(self, timeout, cb):
-        yield self.env.timeout(timeout)
+        yield self._env.timeout(timeout)
         cb()
 
     def get_default_tier(self):
@@ -162,8 +164,8 @@ class StorageManager:
 
         # TODO: find migration delay from a paper
         delay = 0.
-        delay += target_tier.create_file(timestamp, file.path, file=file)
-        delay += max(file.tier.read_file(timestamp, file.path), target_tier.write_file(timestamp, file.path))
-        delay += file.tier.delete_file(file.path)
+        delay += target_tier.create_file(timestamp, file.path, file=file, event_priority=0)
+        delay += max(file.tier.read_file(timestamp, file.path, event_priority=1), target_tier.write_file(timestamp, file.path, event_priority=1))
+        delay += file.tier.delete_file(file.path, event_priority=2)
 
         return delay
