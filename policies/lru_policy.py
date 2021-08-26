@@ -24,7 +24,7 @@ class LRUPolicy(Policy):
             print(f'{file.path} deleted')
         #self.lru_file_list.remove(file.path)
         if file.path in self.lru_file_dict: # else we don't need to do anything since it's already not there
-            self.lru_file_dict.move_to_end()
+            self.lru_file_dict.move_to_end(file.path)
             self.lru_file_dict.popitem()
 
     def on_file_access(self, file: File, is_write: bool):

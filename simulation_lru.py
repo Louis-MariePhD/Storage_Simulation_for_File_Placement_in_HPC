@@ -24,8 +24,8 @@ class Simulation:
             # TODO : les stats qu'on voulait aka le nombre d'operations sur chaque tier
             tier = self._storage.tiers[i]
             tier_occupation = sum([file.size for file in tier.content.values()])
-            print(f'Tier "{tier.name}" of size {tier.max_size / (10 ** 9)} Gio'
-                  f' ({tier_occupation} octets aka {round(tier_occupation/(10 ** 6), 3)} Mio used)'
+            print(f'Tier "{tier.name}" of size {tier.max_size / (10 ** 12)} TB'
+                  f' ({tier_occupation} octets aka {round(tier_occupation/(10 ** 9), 3)} GB used)'
                   f': {self._stats[i][0]} write ({round(self._stats[i][1], 6)} seconds), {self._stats[i][2]} reads ('
                   f'{round(self._stats[i][3], 6)} seconds)')
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
             print('file loaded with pickle')
 
         print('done loading trace')
-        tier_ssd = Tier('SSD', 512 * 10 ** 9, 'unknown latency', 'unknown throughput')
+        tier_ssd = Tier('SSD', 10 * 10 ** 12, 'unknown latency', 'unknown throughput')
         tier_hdd = Tier('HDD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput')
         tier_tapes = Tier('Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)

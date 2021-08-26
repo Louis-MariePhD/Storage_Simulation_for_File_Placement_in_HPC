@@ -1,3 +1,4 @@
+import trace
 import simpy
 from simpy.core import Environment
 from trace import Trace
@@ -101,6 +102,15 @@ if __name__ == "__main__":
             print('file loaded with pickle')
 
         print('done loading trace')
+
+        lifetime_per_fileid = traces[0].lifetime_per_fileid
+        total = len(lifetime_per_fileid)
+        null_lifetimes = 0
+        for k, v in lifetime_per_fileid.items():
+            if v  == 0:
+                null_lifetimes+=1
+        print('number of files : {} proportion of null lifetime : {} %'.format(total ,(null_lifetimes/total) * 100))
+        exit()
         #traces = [Trace(PARADIS_HDF5)]
         tier_ssd = Tier('SSD', 512 * 10 ** 9, 'unknown latency', 'unknown throughput')
         tier_hdd = Tier('HDD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput')

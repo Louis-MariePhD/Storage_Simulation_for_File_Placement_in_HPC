@@ -99,7 +99,7 @@ if __name__ == "__main__":
             print('file loaded with pickle')
 
         print('done loading trace')
-        tier_ssd = Tier('SSD', 512 * 10 ** 9, 'unknown latency', 'unknown throughput')
+        tier_ssd = Tier('SSD', 4 * 10 ** 12, 'unknown latency', 'unknown throughput')
         tier_hdd = Tier('HDD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput')
         tier_tapes = Tier('Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)

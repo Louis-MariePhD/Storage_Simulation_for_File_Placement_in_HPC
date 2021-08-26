@@ -91,14 +91,15 @@ if __name__ == "__main__":
         env = simpy.Environment()
         if os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle') :
             with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'rb') as f:
+                print('loading with pickle')
                 traces = [pickle.load(f)]
+                print('file loaded with pickle')
         else:
             traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
             print('loading with pickle')
             with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'wb') as f:
                 pickle.dump(traces[0], f)
             print('file loaded with pickle')
-
         print('done loading trace')
         tier_ssd = Tier('SSD', 512 * 10 ** 9, 'unknown latency', 'unknown throughput')
         tier_hdd = Tier('HDD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput')

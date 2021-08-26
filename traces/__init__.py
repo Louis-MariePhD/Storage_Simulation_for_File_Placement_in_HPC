@@ -17,4 +17,4 @@ PARADIS_POSIX = os.path.join(PATH, "ParaDis.v2.5.1.1/64p/Copper_POSIX/recorder-l
 DATASETS_PATHS = [VPIC_PATH_UNI, VPIC_PATH_NONUNI, MILC_QCD_PARALLEL, PARADIS_HDF5, PARADIS_POSIX]
 DATASETS_NAMES = ["VPIC (UNI)", "VPIC (NONUNI)", "MILC QCD (PARALLEL)","PARADIS_HDF5", "PARADIS_POSIX"]
 
-TENCENT_DATASET_FILE_THREAD1 = os.path.join(PATH, "dataset_tencent/http_thread1_normal.log.17")
+TENCENT_DATASET_FILE_THREAD1 = os.path.join(PATH, "dataset_tencent/http_thread1_normal.log.17-24")

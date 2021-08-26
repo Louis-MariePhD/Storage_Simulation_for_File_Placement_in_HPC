@@ -33,11 +33,9 @@ class Trace:
             print(
                 f'[trace-reader] Started loading traces from data folder "{trace_path}" into memory')
             line = f.readline()
-            with tqdm(total = 500000) as pbar:
-            #with tqdm(total = os.path.getsize(trace_path)) as pbar:
+            with tqdm(total = os.path.getsize(trace_path)) as pbar:
                 line = f.readline()
-                for i in range(500000): # just to get a faster simulation
-                #while len(line) != 0:
+                while len(line) != 0:
                     pbar.update(len(line))
                     columns = line.split(' ')
                     timestamp = int(datetime.datetime.strptime(
@@ -59,9 +57,12 @@ class Trace:
         for k in self.file_ids_occurences.keys():
             v = self.file_ids_occurences[k]
             # v[0] is the number of accesse : unused
-            creation_time = v[1] 
-            last_access = v[-1]
-            self.lifetime_per_fileid[k] = last_access - creation_time
+            if len(v) > 2:
+                creation_time = v[1]
+                last_access = v[-1]
+                self.lifetime_per_fileid[k] = last_access - creation_time
+            else:
+                self.lifetime_per_fileid[k] = 0
 
         # def __init__(self, trace_path, trace_name="Unnamed trace folder"):
         #     """
