@@ -2,8 +2,6 @@ from os import environ
 from simpy.core import Environment
 from typing import List
 
-from policies.policy import Policy
-
 
 class File:
     def __init__(self, path: str, tier: "Tier", size: int, ctime: float, last_mod: float, last_access: float):
@@ -45,7 +43,7 @@ class Tier:
         self.manager = None
         self.listeners = []
 
-    def register_listener(self, listener : Policy):
+    def register_listener(self, listener : "Policy"):
         self.listeners += [listener]
 
     def has_file(self, path):
@@ -69,9 +67,9 @@ class Tier:
         self.used_size += file.size
         self.content[path]=file
         for listener in self.listeners:
-            listener.on_file_created_event(file)
+            listener.on_file_created(file)
             if self.used_size >= self.max_size*self.target_occupation:
-                listener.on_tier_nearly_full_event()
+                listener.on_tier_nearly_full()
         return 0
 
     def open_file(self):
@@ -88,7 +86,7 @@ class Tier:
             file = self.content[path]
             file.last_access = timestamp
             for listener in self.listeners:
-                listener.on_file_accessed_event(file, False)
+                listener.on_file_access(file, False)
             return 0
 
     def write_file(self, timestamp, path, event_priority=0):
@@ -100,7 +98,7 @@ class Tier:
             file.last_access = timestamp
             file.last_mod = timestamp
             for listener in self.listeners:
-                listener.on_file_accessed_event(file, True)
+                listener.on_file_access(file, True)
             #if self.used_size >= self.max_size*self.target_occupation:
             #    self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())\
             # TODO: update file size, add offset as arg
@@ -120,7 +118,7 @@ class Tier:
             file = self.content.pop(path)
             self.used_size -= file.size
             for listener in self.listeners:
-                listener.on_file_deleted_event(file)
+                listener.on_file_deleted(file)
         return 0
 
 
