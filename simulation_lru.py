@@ -100,8 +100,8 @@ if __name__ == "__main__":
             print('file loaded with pickle')
 
         print('done loading trace')
-        tier_ssd = Tier('SSD', 10 * 10 ** 12, 'unknown latency', 'unknown throughput')
-        tier_hdd = Tier('HDD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput')
+        tier_ssd = Tier('SSD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput')
+        tier_hdd = Tier('HDD', 10 * 10 ** 12, 'unknown latency', 'unknown throughput')
         tier_tapes = Tier('Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput')
         storage = StorageManager([tier_ssd, tier_hdd, tier_tapes], env)
         policy_tier_sdd = LRUPolicy(tier_ssd, storage, env)
