@@ -43,6 +43,13 @@ class Tier:
         self.manager = None
         self.listeners = []
 
+        self.number_of_reads = 0
+        self.number_of_write = 0
+        self.number_of_eviction_from_this_tier = 0
+        self.number_of_eviction_to_this_tier = 0
+        self.number_of_prefetching_from_this_tier = 0
+        self.number_of_prefetching_to_this_tier = 0
+
     def register_listener(self, listener : "Policy"):
         self.listeners += [listener]
 
@@ -78,30 +85,50 @@ class Tier:
         """
         return 0
 
-    def read_file(self, timestamp, path, event_priority=0):
+    def read_file(self, timestamp, path, update_meta=True, cause=None):
         """
         :return: time in seconds until operation completion
         """
         if path in self.content.keys():
             file = self.content[path]
-            file.last_access = timestamp
+            if update_meta:
+                file.last_access = timestamp
             for listener in self.listeners:
                 listener.on_file_access(file, False)
-            return 0
+            self.number_of_reads += 1
+            if cause is not None:
+                if cause == "eviction":
+                    self.number_of_eviction_from_this_tier += 1
+                elif cause == "prefetching":
+                    self.number_of_prefetching_from_this_tier += 1
+                else:
+                    raise RuntimeError(f'Unknown cause {cause}. Expected "eviction", "prefetching" or None')
+        else:
+            print(f'File {path} should be in tiers {self.name} but it is not. Recheck your trace and policies!')
+        return 0
 
-    def write_file(self, timestamp, path, event_priority=0):
+    def write_file(self, timestamp, path, update_meta=True, cause=None):
         """
         :return: time in seconds until operation completion
         """
         if path in self.content.keys():
             file = self.content[path]
-            file.last_access = timestamp
-            file.last_mod = timestamp
+            if update_meta:
+                file.last_access = timestamp
+                file.last_mod = timestamp
             for listener in self.listeners:
                 listener.on_file_access(file, True)
-            #if self.used_size >= self.max_size*self.target_occupation:
-            #    self.manager.fire_event(self.manager.on_tier_nearly_full_event, self, ())\
+            self.number_of_write += 1
+            if cause is not None:
+                if cause == "eviction":
+                    self.number_of_eviction_to_this_tier += 1
+                elif cause == "prefetching":
+                    self.number_of_prefetching_to_this_tier += 1
+                else:
+                    raise RuntimeError(f'Unknown cause {cause}. Expected "eviction", "prefetching" or None')
             # TODO: update file size, add offset as arg
+        else:
+            print(f'File {path} should be in tiers {self.name} but it is not. Recheck your trace and policies!')
         return 0
 
     def close_file(self):
@@ -166,10 +193,14 @@ class StorageManager:
         if file.tier is target_tier:
             return  # Migration has already been done. Nothing to do?
 
+        is_eviction = file.tier.manager.tiers.index(file.tier) > file.tier.manager.tiers.index(target_tier)
+        cause = ["prefetching", "eviction"][is_eviction]
+
         # TODO: find migration delay from a paper
         delay = 0.
-        delay += target_tier.create_file(timestamp, file.path, file=file, event_priority=0)
-        delay += max(file.tier.read_file(timestamp, file.path, event_priority=1), target_tier.write_file(timestamp, file.path, event_priority=1))
+        delay += target_tier.create_file(timestamp, file.path, file=file)
+        delay += max(file.tier.read_file(timestamp, file.path, update_meta=False, cause=cause),
+                     target_tier.write_file(timestamp, file.path, update_meta=False, cause=cause))
         delay += file.tier.delete_file(file.path, event_priority=2)
 
         return delay

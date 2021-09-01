@@ -25,17 +25,16 @@ available_policies = {"lru" : LRUPolicy,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="Re-enable printing to console during simulation", action="store_true")
-    parser.add_argument("-p", "--no-progress-bar", help="Disable progress bar", action="store_false")
+    parser.add_argument("-p", "--no-progress-bar", help="Disable progress bar", action="store_true", default=False)
     parser.add_argument("-o", "--output-folder", help="The folder in which logs, results and a copy of the config "
-                                                      "will be saved", default="logs/<timestamp>", type=str)
+                                                      "will be saved", default="logs/run_<timestamp>", type=str)
     parser.add_argument("-c", "--config-file", help="The config file that will be used for this simulation run. If it "
                                                     "doesn't exist at the given path, a new one will be created and "
                                                     "simulation will exit.",
                         default=os.path.join(os.path.dirname(__file__), "config.cfg"))
-    parser.add_argument("policies", nargs='+', choices=["all",
-                                                        *list(available_policies.keys())])
+    parser.add_argument("policies", nargs='+', choices=["all"]+list(available_policies.keys()))
     args = vars(parser.parse_args())
-    verbose, config_file, no_progress_bar, output_folder, policies = args.values()
+    verbose, no_progress_bar, output_folder, config_file, policies = args.values()
     if "all" in policies:
         policies = list(available_policies.keys())
         args["policies"] = policies
@@ -50,20 +49,28 @@ if __name__ == "__main__":
         env = simpy.Environment()
 
         # Trace
+        traces = None
         if os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle'):
-            with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'rb') as f:
-                t0 = time.time()
-                print('Loading with pickle...', end=' ')
-                traces = [pickle.load(f)]
-                print('Done after {} ms!')
-        else:
-            print('Loading from file, please wait...', end=' ')
+            try:
+                with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'rb') as f:
+                    t0 = time.time()
+                    print('Loading trace with pickle...', end=' ', flush=True)
+                    traces = [pickle.load(f)]
+                    print(f'Done after {round((time.time()-t0)*1000)} ms!')
+            except:
+                print("Unable to unpickle file! Deleting pickle file and falling back to slower trace loading.")
+                os.remove(TENCENT_DATASET_FILE_THREAD1 + '.pickle')
+
+        if traces is None:
+            print('Loading trace from file, please wait...')
+            t0 = time.time()
             traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
-            print('Done after {} ms!')
-            print('Saving to pickle for faster trace load next time...', end=' ')
+            print(f'Done after {round((time.time()-t0)*1000)} ms!')
+            print('Saving to pickle for faster trace load next time...', end=' ', flush=True)
+            t0 = time.time()
             with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'wb') as f:
                 pickle.dump(traces[0], f)
-            print('Done after {} ms!')
+            print(f'Done after {round((time.time()-t0)*1000)} ms!')
 
         # Tiers
         # TODO: Add config here
@@ -78,5 +85,9 @@ if __name__ == "__main__":
         policy_tier_sdd = policy(tier_ssd, storage, env)
         policy_tier_hdd = policy(tier_hdd, storage, env)
 
-        sim = Simulation(traces, storage, env, os.path.join(output_folder, "latest.log"))
+        sim = Simulation(traces, storage, env, log_file=os.path.join(output_folder, "latest.log")
+                         .replace("<timestamp>", time.strftime("%a_%d_%b_%Y_%H:%M:%S_+0000", time.localtime())),
+                         progress_bar_enabled=not no_progress_bar,
+                         logs_enabled=verbose)
+        print("Starting simulation!")
         sim.run()
