@@ -33,22 +33,23 @@ if __name__ == "__main__":
                                                     "simulation will exit.",
                         default=os.path.join(os.path.dirname(__file__), "config.cfg"))
     parser.add_argument("policies", nargs='+', choices=["all"]+list(available_policies.keys()))
+
     args = vars(parser.parse_args())
     verbose, no_progress_bar, output_folder, config_file, policies = args.values()
+
     if "all" in policies:
         policies = list(available_policies.keys())
         args["policies"] = policies
 
     print(f'Starting program with parameters {str(args)[1:-1]}') # If you got an error here, you are using python 2.
 
-    if len(policies)>1:
-        # branch log dir & start subprocess
-        pass
-    else:
-        # Simpy env
+    for selected_policy in policies:
+        # TODO: branching / subprocesses
+
+        # Init simpy env
         env = simpy.Environment()
 
-        # Trace
+        # Load trace
         traces = None
         if os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle'):
             try:
@@ -81,7 +82,7 @@ if __name__ == "__main__":
 
         # Policies
         # No config needed for now, maybe later
-        policy = available_policies[policies[0]]
+        policy = available_policies[selected_policy]
         policy_tier_sdd = policy(tier_ssd, storage, env)
         policy_tier_hdd = policy(tier_hdd, storage, env)
 
@@ -91,3 +92,9 @@ if __name__ == "__main__":
                          logs_enabled=verbose)
         print("Starting simulation!")
         sim.run()
+
+        # TODO: ajout de métriques temporelles + vérif des métriques actuelles
+        # TODO: ajout d'une option pour ajouter des accès à la trace
+        # TODO: ajout de graphe matplotlib exportés en png en fin de simulation
+        # TODO: tiers dans le fichier de config?
+        # TODO: execution parallèle ?
