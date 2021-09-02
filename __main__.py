@@ -61,6 +61,19 @@ if __name__ == "__main__":
     storage_config_list = [[['SSD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
                             ['HDD', 10 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
                             ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']]]
+
+    # plot entry: line name (tiers), storage_config (X), stats (Y)
+
+    plot_data = []
+
+    # WIP
+    def add_to_plot(plot_data, storage_config, policy_name, tiers):
+        plot_data += [storage_config, policy_name, tiers.stats()]
+
+    # WIP
+    def gen_plot(plot_data):
+        pass
+
     for storage_config in storage_config_list:
         for selected_policy in policies:
 
@@ -92,7 +105,6 @@ if __name__ == "__main__":
                 print(f'Done after {round((time.time() - t0) * 1000)} ms!')
 
             # Tiers
-            # TODO: Add config here
             tiers = [Tier(*config[:-1]) for config in storage_config]
             storage = StorageManager(tiers, env)
 

@@ -53,6 +53,14 @@ class Tier:
     def register_listener(self, listener : "Policy"):
         self.listeners += [listener]
 
+    def stats(self):
+        return {"number_of_reads": self.number_of_reads,
+                "number_of_write": self.number_of_write,
+                "number_of_eviction_from_this_tier": self.number_of_eviction_from_this_tier,
+                "number_of_eviction_to_this_tier": self.number_of_eviction_to_this_tier,
+                "number_of_prefetching_from_this_tier": self.number_of_prefetching_from_this_tier,
+                "number_of_prefetching_to_this_tier": self.number_of_prefetching_to_this_tier}
+
     def has_file(self, path):
         return path in self.content.keys()
 
