@@ -27,11 +27,12 @@ class Simulation:
         print(f'Simulation finished after {round(time.time()-t0, 3)} seconds! Printing results:')
         s = f'\n{" "*4}>> '
         s2 = f'\n{" "*8}>> '
+        output = ""
         for tier in self._storage.tiers:
             tier_occupation = sum([file.size for file in tier.content.values()])
             total_migration_count = tier.number_of_eviction_from_this_tier+tier.number_of_eviction_to_this_tier+\
             tier.number_of_prefetching_from_this_tier+tier.number_of_prefetching_to_this_tier
-            print(f'Tier "{tier.name}":'
+            output += (f'Tier "{tier.name}":'
                   f'{s}Size {tier.max_size / (10 ** 9)} Go ({tier_occupation} octets)'
                   f'{s}{total_migration_count} migrations'
                   f'{s2}{tier.number_of_prefetching_to_this_tier} due to prefetching to this tiers'
@@ -45,7 +46,8 @@ class Simulation:
                   f'{s}{tier.number_of_reads} total reads'
                   f'{s2}{tier.number_of_reads-tier.number_of_prefetching_from_this_tier-tier.number_of_eviction_from_this_tier} because of user activity'
                   f'{s2}{tier.number_of_prefetching_from_this_tier+tier.number_of_eviction_from_this_tier} '
-                  'because of migration')
+                  'because of migration\n\n')
+        return output
 
     def _read_trace(self, trace: Trace, simulate_perfect_prefetch: bool = False):
         """Read a trace as a line list, while updating a progress bar. Runs self._read_line for each line"""
