@@ -8,6 +8,7 @@ import os
 import time
 import pickle
 import simpy
+from configparser import ConfigParser
 
 from simulation import Simulation
 from storage import Tier, StorageManager
@@ -56,6 +57,7 @@ if __name__ == "__main__":
 
     run_index = 0
     formatted_results = ""
+    # storage_config_list contains storage_config (for a single experiment) which contains config ()
     storage_config_list = [[['SSD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
                             ['HDD', 10 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
                             ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']]]
