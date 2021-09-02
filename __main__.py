@@ -61,16 +61,11 @@ if __name__ == "__main__":
                             ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']]]
 
     # plot entry: line name (tiers), storage_config (X), stats (Y)
-
-    plot_data = []
-
     # WIP
-    def add_to_plot(plot_data, storage_config, policy_name, tiers):
-        plot_data += [storage_config, policy_name, tiers.stats()]
-
-    # WIP
-    def gen_plot(plot_data):
-        pass
+    import matplotlib.pyplot as plt
+    plt.figure()
+    x = [] # storage config str
+    plots = {} # policy + stat -> value
 
     for storage_config in storage_config_list:
         for selected_policy in policies:
@@ -108,16 +103,24 @@ if __name__ == "__main__":
 
             # Policies
             # No config needed for now, maybe later
-            commandline_policy = available_policies[selected_policy]
+            commandline_policy_class = available_policies[selected_policy]
             index = 0
             for config in storage_config:
                 policy_str = config[-1]
+
+                policy_class = None
                 if policy_str == "no-policy":
                     pass
                 elif policy_str == "commandline-policy":
-                    commandline_policy(tiers[index], storage, env)
+                    policy_class = commandline_policy_class
                 elif policy_str in available_policies.keys():
-                    available_policies[policy_str](tiers[index], storage, env)
+                    policy_class = available_policies[policy_str]
+                if policy_class == LRU_LifetimeOverunPolicy:
+                    policy_class(tiers[index], storage, env, traces[0].lifetime_per_fileid())
+                else:
+                    policy_class(tiers[index], storage, env)
+
+
                 index+=1
 
             sim = Simulation(traces, storage, env, log_file=os.path.join(output_folder, "latest.log"),
