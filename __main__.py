@@ -63,8 +63,12 @@ if __name__ == "__main__":
     # plot entry: line name (tiers), storage_config (X), stats (Y)
 
     plot_data = []
+
+    # WIP
     def add_to_plot(plot_data, storage_config, policy_name, tiers):
         plot_data += [storage_config, policy_name, tiers.stats()]
+
+    # WIP
     def gen_plot(plot_data):
         pass
 
