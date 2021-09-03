@@ -9,6 +9,8 @@ import time
 import pickle
 import simpy
 from configparser import ConfigParser
+import matplotlib.pyplot as plt
+
 
 from simulation import Simulation
 from storage import Tier, StorageManager
@@ -27,7 +29,10 @@ available_policies = {"lru": LRUPolicy,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="Re-enable printing to console during simulation", action="store_true")
+    parser.add_argument("-n", "--no-ui", help="Disable opening the figure at the end of a simulation", action="store_true")
     parser.add_argument("-p", "--no-progress-bar", help="Disable progress bar", action="store_true", default=False)
+    parser.add_argument("-l", "--limit-trace", help="Limit the number of line that will be read from the trace",
+                        default="-1", type=int)
     parser.add_argument("-o", "--output-folder", help="The folder in which logs, results and a copy of the config "
                                                       "will be saved", default="logs/<timestamp>", type=str)
     parser.add_argument("-c", "--config-file", help="The config file that will be used for this simulation run. If it "
@@ -37,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("policies", nargs='+', choices=["all"] + list(available_policies.keys()))
 
     args = vars(parser.parse_args())
-    verbose, no_progress_bar, output_folder, config_file, policies = args.values()
+    verbose, no_ui, no_progress_bar, limit_trace_len, output_folder, config_file, policies = args.values()
 
     if "all" in policies:
         policies = list(available_policies.keys())
@@ -58,18 +63,28 @@ if __name__ == "__main__":
     run_index = 0
     formatted_results = ""
     # storage_config_list contains storage_config (for a single experiment) which contains config ()
-    storage_config_list = [[['SSD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['HDD', 10 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+    storage_config_list = [[['SSD', 1 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
+                           [['SSD', 2 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
+                           [['SSD', 3 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
+                           [['SSD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
+                           [['SSD', 8 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
+                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
                             ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']]]
 
-    # plot entry: line name (tiers), storage_config (X), stats (Y)
-    # WIP
-    import matplotlib.pyplot as plt
     plt.figure()
-    x = [] # storage config str
-    plots = {} # policy + stat -> value
+    plot_x = [] # storage config str
+    plot_y = {} # policy + stat -> value
 
     for storage_config in storage_config_list:
+        plot_x += [f'{storage_config[0][0]} {round(storage_config[0][1]/(10**12), 1)} Go']
         for selected_policy in policies:
 
             # Init simpy env
@@ -77,7 +92,7 @@ if __name__ == "__main__":
 
             # Load trace
             traces = None
-            if os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle'):
+            if limit_trace_len==-1 and os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle'):
                 try:
                     with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'rb') as f:
                         t0 = time.time()
@@ -91,13 +106,14 @@ if __name__ == "__main__":
             if traces is None:
                 print('Loading trace from file, please wait...')
                 t0 = time.time()
-                traces = [Trace(TENCENT_DATASET_FILE_THREAD1)]
+                traces = [Trace(TENCENT_DATASET_FILE_THREAD1, trace_len_limit=limit_trace_len)]
                 print(f'Done after {round((time.time() - t0) * 1000)} ms!')
-                print('Saving to pickle for faster trace load next time...', end=' ', flush=True)
-                t0 = time.time()
-                with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'wb') as f:
-                    pickle.dump(traces[0], f)
-                print(f'Done after {round((time.time() - t0) * 1000)} ms!')
+                if limit_trace_len == -1:
+                    print('Saving to pickle for faster trace load next time...', end=' ', flush=True)
+                    t0 = time.time()
+                    with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'wb') as f:
+                        pickle.dump(traces[0], f)
+                    print(f'Done after {round((time.time() - t0) * 1000)} ms!')
 
             # Tiers
             tiers = [Tier(*config[:-1]) for config in storage_config]
@@ -112,13 +128,14 @@ if __name__ == "__main__":
 
                 policy_class = None
                 if policy_str == "no-policy":
-                    pass
+                    index+=1
+                    continue
                 elif policy_str == "commandline-policy":
                     policy_class = commandline_policy_class
                 elif policy_str in available_policies.keys():
                     policy_class = available_policies[policy_str]
                 if policy_class == LRU_LifetimeOverunPolicy:
-                    policy_class(tiers[index], storage, env, traces[0].lifetime_per_fileid())
+                    policy_class(tiers[index], storage, env, traces[0].lifetime_per_fileid)
                 else:
                     policy_class(tiers[index], storage, env)
 
@@ -128,20 +145,53 @@ if __name__ == "__main__":
             sim = Simulation(traces, storage, env, log_file=os.path.join(output_folder, "latest.log"),
                              progress_bar_enabled=not no_progress_bar,
                              logs_enabled=verbose)
-            print(f'Starting simulation for policy {policy_str} and storage config {storage_config}!')
+            print(f'Starting simulation for policy {selected_policy} and storage config {storage_config}!')
             last_results = sim.run()
             last_results = f'{"#" * 10} Run N°{run_index} {"#" * 10}\n{last_results}\n'
+            run_index+=1
             print(last_results)
             formatted_results += last_results
+
+            for tier in tiers:
+                for stat_name, stat_value in [("Nombre d'io", tier.number_of_reads+tier.number_of_write),
+                                              ("Nombre de migration", tier.number_of_prefetching_from_this_tier
+                                               + tier.number_of_prefetching_to_this_tier
+                                               + tier.number_of_eviction_from_this_tier
+                                               + tier.number_of_eviction_to_this_tier)]:
+                    line_name = f'{selected_policy} - {tier.name} - {stat_name}'
+                    if line_name not in plot_y.keys():
+                        plot_y[line_name] = []
+                    plot_y[line_name] += [stat_value]
+
+    for line_name in plot_y.keys():
+        plt.plot(plot_x, plot_y[line_name], "+-", label=line_name)
+    plt.tight_layout()
+    plt.legend()
+
+    fig, axs = plt.subplots(1, 1)
+    axs.axis("tight")
+    axs.axis("off")
+    axs.table(cellText=list(plot_y.values()), rowLabels=list(plot_y.keys()), colLabels=plot_x, loc="center")
+    fig.tight_layout()
 
     try:
         with open(os.path.join(output_folder, "formatted_results.txt"), "w") as f:
             f.write(formatted_results)
+        with open(os.path.join(output_folder, "results_display.py"), "w") as f:
+            f.write(f'import matplotlib.pyplot as plt\n\n# plot_x\nplot_x = {plot_x}\n\n# plot_y\nplot_y = {plot_y}\n\n'
+                    'plt.figure(0)\nfor line_name in plot_y.keys():\n    plt.plot(plot_x, plot_y[line_name], "+-", '
+                    'label=line_name)\nplt.legend()\n\n'
+                    'fig, axs = plt.subplots(1,1)\naxs.axis("tight")\naxs.axis("off")\naxs.table(cellText=list(plot_y.'
+                    'values()), rowLabels=list(plot_y.keys()), colLabels=plot_x, loc="center")\nfig.tight_layout()\n'
+                    'plt.show()\n')
+        plt.savefig(os.path.join(output_folder, "figure.png"))
     except:
         print(f'Error trying to write into a new file in output folder "{output_folder}"')
 
+    if not no_ui:
+        plt.show()
+
     # TODO: ajout de métriques temporelles + vérif des métriques actuelles
     # TODO: ajout d'une option pour ajouter des accès à la trace
-    # TODO: ajout de graphe matplotlib exporté en png en fin de simulation
     # TODO: tiers dans le fichier de config?
     # TODO: execution parallèle ?

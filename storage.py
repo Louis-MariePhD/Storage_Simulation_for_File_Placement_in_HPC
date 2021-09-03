@@ -201,7 +201,7 @@ class StorageManager:
         if file.tier is target_tier:
             return  # Migration has already been done. Nothing to do?
 
-        is_eviction = file.tier.manager.tiers.index(file.tier) > file.tier.manager.tiers.index(target_tier)
+        is_eviction = file.tier.manager.tiers.index(file.tier) < file.tier.manager.tiers.index(target_tier)
         cause = ["prefetching", "eviction"][is_eviction]
 
         # TODO: find migration delay from a paper

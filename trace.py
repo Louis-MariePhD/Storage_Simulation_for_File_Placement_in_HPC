@@ -22,7 +22,7 @@ class Trace:
         'c': 6050183,
         'b': 8387821}
 
-    def __init__(self, trace_path: str, trace_type: int = 0):
+    def __init__(self, trace_path: str, trace_type: int = 0, trace_len_limit = -1):
 
         self.data = []
         file_count = 0
@@ -33,6 +33,7 @@ class Trace:
             print(
                 f'[trace-reader] Started loading traces from data folder "{trace_path}" into memory')
             line = f.readline()
+            line_count = 0
             with tqdm(total = os.path.getsize(trace_path)) as pbar:
                 line = f.readline()
                 while len(line) != 0:
@@ -50,6 +51,11 @@ class Trace:
                     # number of bytes returned by the request
                     return_size = columns[4]
                     self.data += [[file_id, timestamp, class_size, return_size]]
+
+                    line_count+=1
+                    if trace_len_limit>0 and line_count> trace_len_limit:
+                        break
+
                     line = f.readline()
             print(f'[trace-reader] Done loading trace "{trace_path}", for a total of {len(self.data)} '
                     f'read/writes operations, on {len(self.file_ids_occurences)} uniques file names.')
