@@ -84,7 +84,7 @@ if __name__ == "__main__":
     plot_y = {} # policy + stat -> value
 
     for storage_config in storage_config_list:
-        plot_x += [f'{storage_config[0][0]} {round(storage_config[0][1]/(10**12), 1)} Go']
+        plot_x += [f'{storage_config[0][0]} {round(storage_config[0][1]/(10**9), 1)} Go']
         for selected_policy in policies:
 
             # Init simpy env
