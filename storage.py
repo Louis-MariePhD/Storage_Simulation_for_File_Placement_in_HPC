@@ -98,7 +98,6 @@ class Tier:
             file = File(path, self, size, file.creation_time, file.last_modification, file.last_access)
             assert file.path in self.content.keys()
         self.used_size += file.size
-        self.time_spent_writing += self.latency + file.size / self.throughput
         assert path in self.content.keys()
         assert file.path in self.content.keys()
         for listener in self.listeners:
