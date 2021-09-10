@@ -7,7 +7,7 @@ from tqdm import tqdm
 _DEBUG = False
 
 
-class Trace:
+class SNIATrace:
 
     # Column names extracted from recorder_viz, kept here as static members vars
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
@@ -57,8 +57,11 @@ class Trace:
                         break
 
                     line = f.readline()
+            reused_percent = round(len([1 for oc in self.file_ids_occurences.values() if oc[0] > 1])
+                                   / float(len(self.file_ids_occurences.values()))*100.,3)
             print(f'[trace-reader] Done loading trace "{trace_path}", for a total of {len(self.data)} '
-                    f'read/writes operations, on {len(self.file_ids_occurences)} uniques file names.')
+                  f'read/writes operations, on {len(self.file_ids_occurences)} uniques file names. '
+                  f'{reused_percent}% of files are reused after their creation.')
 
         for k in self.file_ids_occurences.keys():
             v = self.file_ids_occurences[k]

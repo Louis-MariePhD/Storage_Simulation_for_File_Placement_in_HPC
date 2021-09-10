@@ -1,35 +1,43 @@
 import sys
-
-if sys.version_info[0] < 3:
-    raise Exception("Must be using Python 3")
-
 import argparse
 import os
 import time
 import pickle
 import simpy
-from configparser import ConfigParser
 import matplotlib.pyplot as plt
+from math import sqrt
 
+if sys.version_info[0] < 3:
+    raise Exception("Must be using Python 3")
 
 from simulation import Simulation
 from storage import Tier, StorageManager
-from trace import Trace
-from traces import TENCENT_DATASET_FILE_THREAD1
+from resources import TENCENT_DATASET_FILE_THREAD1
+
 from policies.lru_policy import LRUPolicy
 from policies.fifo_policy import FIFOPolicy
-from policies.lifetime_overun_policy import LRU_LifetimeOverunPolicy
+from policies.lifetime_overun_policy import LifetimeOverrunPolicy
 from policies.random_policy import RandomPolicy
+
+from traces.augmented_snia_trace import AugmentedSNIATrace
+from traces.custom_trace import CustomTrace
+from traces.snia_trace import SNIATrace
 
 available_policies = {"lru": LRUPolicy,
                       "fifo": FIFOPolicy,
-                      "lru-lifetime": LRU_LifetimeOverunPolicy,
+                      "lifetime": LifetimeOverrunPolicy,
                       "random": RandomPolicy}
+available_traces = {"snia": SNIATrace,
+                    "augmented-snia": AugmentedSNIATrace,
+                    "custom": CustomTrace}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="Re-enable printing to console during simulation", action="store_true")
-    parser.add_argument("-n", "--no-ui", help="Disable opening the figure at the end of a simulation", action="store_true")
+    parser.add_argument("-n", "--no-ui", help="Disable opening the figure at the end of a simulation",
+                        action="store_true")
+    parser.add_argument("-t", "--trace", help="Use a different trace",
+                        choices=list(available_traces.keys()), default="augmented-snia")
     parser.add_argument("-p", "--no-progress-bar", help="Disable progress bar", action="store_true", default=False)
     parser.add_argument("-l", "--limit-trace", help="Limit the number of line that will be read from the trace",
                         default="-1", type=int)
@@ -42,8 +50,9 @@ if __name__ == "__main__":
     parser.add_argument("policies", nargs='+', choices=["all"] + list(available_policies.keys()))
 
     args = vars(parser.parse_args())
-    verbose, no_ui, no_progress_bar, limit_trace_len, output_folder, config_file, policies = args.values()
+    verbose, no_ui, custom_trace, no_progress_bar, limit_trace_len, output_folder, config_file, policies = args.values()
 
+    trace_class = available_traces[custom_trace]
     if "all" in policies:
         policies = list(available_policies.keys())
         args["policies"] = policies
@@ -62,29 +71,26 @@ if __name__ == "__main__":
 
     run_index = 0
     formatted_results = ""
-    # storage_config_list contains storage_config (for a single experiment) which contains config ()
-    storage_config_list = [[['SSD', 1 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
-                           [['SSD', 2 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
-                           [['SSD', 3 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
-                           [['SSD', 5 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']],
-                           [['SSD', 8 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['HDD', 15 * 10 ** 12, 'unknown latency', 'unknown throughput', 'commandline-policy'],
-                            ['Tapes', 50 * 10 ** 12, 'unknown latency', 'unknown throughput', 'no-policy']]]
+    unit = 10 ** 11
+    number_of_tested_config = 12
+    storage_config_list = [[['SSD', round(4 * unit / (sqrt(2) ** (number_of_tested_config - 1 - i))), 100e-6,
+                             2e9, 'commandline-policy'],
+                            ['HDD', 8 * unit, 10e-3, 250e6, 'commandline-policy'],
+                            ['Tapes', 50 * unit, 20, 315e6, 'no-policy']] for i in
+                           range(number_of_tested_config)]
 
-    plt.figure()
-    plot_x = [] # storage config str
-    plot_y = {} # policy + stat -> value
+    plot_x = []  # storage config str
+    plot_y = {}  # policy + stat -> value
+
+    path = TENCENT_DATASET_FILE_THREAD1
+    if limit_trace_len != -1:
+        path += f'_l{limit_trace_len}'
+    if custom_trace:
+        path += "_augmented"
+    path += '.pickle'
 
     for storage_config in storage_config_list:
-        plot_x += [f'{storage_config[0][0]} {round(storage_config[0][1]/(10**9), 1)} Go']
+        plot_x += [f'{storage_config[0][0]} {round(storage_config[0][1] / (10 ** 9), 3)} Go']
         for selected_policy in policies:
 
             # Init simpy env
@@ -92,28 +98,28 @@ if __name__ == "__main__":
 
             # Load trace
             traces = None
-            if limit_trace_len==-1 and os.path.exists(TENCENT_DATASET_FILE_THREAD1 + '.pickle'):
+            if os.path.exists(path):
                 try:
-                    with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'rb') as f:
+                    with open(path, 'rb') as f:
                         t0 = time.time()
                         print('Loading trace with pickle...', end=' ', flush=True)
                         traces = [pickle.load(f)]
                         print(f'Done after {round((time.time() - t0) * 1000)} ms!')
                 except:
                     print("Unable to unpickle file! Deleting pickle file and falling back to slower trace loading.")
-                    os.remove(TENCENT_DATASET_FILE_THREAD1 + '.pickle')
+                    os.remove(path)
 
             if traces is None:
                 print('Loading trace from file, please wait...')
                 t0 = time.time()
-                traces = [Trace(TENCENT_DATASET_FILE_THREAD1, trace_len_limit=limit_trace_len)]
+                traces = [trace_class(TENCENT_DATASET_FILE_THREAD1, trace_len_limit=limit_trace_len)]
+                print(f'Done loading file from file after {round((time.time() - t0) * 1000)} ms!')
+
+                print('Saving to pickle for faster trace load next time...', end=' ', flush=True)
+                t0 = time.time()
+                with open(path, 'wb') as f:
+                    pickle.dump(traces[0], f)
                 print(f'Done after {round((time.time() - t0) * 1000)} ms!')
-                if limit_trace_len == -1:
-                    print('Saving to pickle for faster trace load next time...', end=' ', flush=True)
-                    t0 = time.time()
-                    with open(TENCENT_DATASET_FILE_THREAD1 + '.pickle', 'wb') as f:
-                        pickle.dump(traces[0], f)
-                    print(f'Done after {round((time.time() - t0) * 1000)} ms!')
 
             # Tiers
             tiers = [Tier(*config[:-1]) for config in storage_config]
@@ -128,19 +134,18 @@ if __name__ == "__main__":
 
                 policy_class = None
                 if policy_str == "no-policy":
-                    index+=1
+                    index += 1
                     continue
                 elif policy_str == "commandline-policy":
                     policy_class = commandline_policy_class
                 elif policy_str in available_policies.keys():
                     policy_class = available_policies[policy_str]
-                if policy_class == LRU_LifetimeOverunPolicy:
+                if policy_class == LifetimeOverrunPolicy:
                     policy_class(tiers[index], storage, env, traces[0].lifetime_per_fileid)
                 else:
                     policy_class(tiers[index], storage, env)
 
-
-                index+=1
+                index += 1
 
             sim = Simulation(traces, storage, env, log_file=os.path.join(output_folder, "latest.log"),
                              progress_bar_enabled=not no_progress_bar,
@@ -148,43 +153,83 @@ if __name__ == "__main__":
             print(f'Starting simulation for policy {selected_policy} and storage config {storage_config}!')
             last_results = sim.run()
             last_results = f'{"#" * 10} Run N°{run_index} {"#" * 10}\n{last_results}\n'
-            run_index+=1
+            run_index += 1
             print(last_results)
             formatted_results += last_results
 
             for tier in tiers:
-                for stat_name, stat_value in [("Nombre d'io", tier.number_of_reads+tier.number_of_write),
-                                              ("Nombre de migration", tier.number_of_prefetching_from_this_tier
-                                               + tier.number_of_prefetching_to_this_tier
-                                               + tier.number_of_eviction_from_this_tier
-                                               + tier.number_of_eviction_to_this_tier)]:
+                for stat_name, stat_value in [("Nombre d'io", tier.number_of_reads + tier.number_of_write),
+                                              ("Nombre d'io de migration", tier.number_of_prefetching_from_this_tier
+                                                                           + tier.number_of_prefetching_to_this_tier
+                                                                           + tier.number_of_eviction_from_this_tier
+                                                                           + tier.number_of_eviction_to_this_tier),
+                                              ("Time spent reading", tier.time_spent_reading),
+                                              ("Time spent writing", tier.time_spent_writing)]:
                     line_name = f'{selected_policy} - {tier.name} - {stat_name}'
                     if line_name not in plot_y.keys():
                         plot_y[line_name] = []
                     plot_y[line_name] += [stat_value]
 
+    index = 0
+    stats_per_config = 4
+    tmp = [plt.subplots(1, 1) for i in range(stats_per_config)]
+    figs = [v[0] for v in tmp]
+    axs = [v[1] for v in tmp]
+    colors = [f'C{i}' for i in range(10)]
+    markers = ['+', 'x', 's', 'o', 'd']
+    storage_tier_count = len(tiers)
+    legend = [[] for i in range(stats_per_config)]
     for line_name in plot_y.keys():
-        plt.plot(plot_x, plot_y[line_name], "+-", label=line_name)
-    plt.tight_layout()
-    plt.legend()
+        legend[index % stats_per_config] += axs[index % stats_per_config].plot(plot_x, plot_y[line_name],
+                                                 f'{colors[int(index / (stats_per_config * storage_tier_count)) % len(colors)]}'
+                                                 f'{markers[(int(index / stats_per_config) % storage_tier_count)%len(markers)]}-', label=line_name)
+        index += 1
+    for i in range(len(figs)):
+        axs[i].legend(loc="upper right")
+        figs[i].tight_layout()
 
     fig, axs = plt.subplots(1, 1)
+    plt.subplots_adjust(left=0.1)
     axs.axis("tight")
     axs.axis("off")
-    axs.table(cellText=list(plot_y.values()), rowLabels=list(plot_y.keys()), colLabels=plot_x, loc="center")
-    fig.tight_layout()
+    table = axs.table(cellText=list(plot_y.values()), rowLabels=list(plot_y.keys()), colLabels=plot_x, loc="center")
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(0.8, 0.8)
+    #fig.tight_layout()
 
     try:
         with open(os.path.join(output_folder, "formatted_results.txt"), "w") as f:
             f.write(formatted_results)
         with open(os.path.join(output_folder, "results_display.py"), "w") as f:
-            f.write(f'import matplotlib.pyplot as plt\n\n# plot_x\nplot_x = {plot_x}\n\n# plot_y\nplot_y = {plot_y}\n\n'
-                    'plt.figure(0)\nfor line_name in plot_y.keys():\n    plt.plot(plot_x, plot_y[line_name], "+-", '
-                    'label=line_name)\nplt.legend()\n\n'
-                    'fig, axs = plt.subplots(1,1)\naxs.axis("tight")\naxs.axis("off")\naxs.table(cellText=list(plot_y.'
+            f.write("import matplotlib.pyplot as plt\n\n"
+                    f'# plot_x\nplot_x = {plot_x}\n\n'
+                    f'# plot_y\nplot_y = {plot_y}\n\n'
+                    "index = 0\n"
+                    "stats_per_config = 2\n"
+                    "fig1, axs1 = plt.subplots(1, 1)\n"
+                    "fig2, axs2 = plt.subplots(1, 1)\n"
+                    "figs = [fig1, fig2]\n"
+                    "axs = [axs1, axs2]\n"
+                    "colors = [f'C{i}' for i in range(10)]\n"
+                    "markers = ['+', 'o', 'd', 's', '*']\n"
+                    f'storage_tier_count = {len(tiers)}\n'
+                    "legend = [[], []]\n"
+                    "for line_name in plot_y.keys():\n"
+                    "    legend[index % 2] += axs[index % 2].plot(plot_x, plot_y[line_name],\n"
+                    "                       f'{colors[int(index/(stats_per_config*storage_tier_count))%len(colors)]}'\n"
+                    "                       f'{markers[index%storage_tier_count]}-', label=line_name)\n"
+                    "    index += 1\n"
+                    "axs1.legend(loc=\"upper right\")\n"
+                    "axs2.legend(loc=\"upper right\")\n"
+                    "fig1.tight_layout()\n"
+                    "fig2.tight_layout()\n"
+                    'fig, axs = plt.subplots(1,1)\nplt.subplots_adjust(left=0.3)\n'
+                    'axs.axis("tight")\naxs.axis("off")\naxs.table(cellText=list(plot_y.'
                     'values()), rowLabels=list(plot_y.keys()), colLabels=plot_x, loc="center")\nfig.tight_layout()\n'
+                    'table.auto_set_font_size(False)\n'
+                    'table.set_fontsize(10)\ntable.scale(1.15, 1.15)\n'
                     'plt.show()\n')
-        plt.savefig(os.path.join(output_folder, "figure.png"))
     except:
         print(f'Error trying to write into a new file in output folder "{output_folder}"')
 

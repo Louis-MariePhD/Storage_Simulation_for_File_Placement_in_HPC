@@ -1,5 +1,5 @@
 from simpy.core import Environment
-from trace import Trace
+from traces.trace import Trace
 from storage import StorageManager
 from tqdm import tqdm
 import sys
@@ -8,7 +8,7 @@ import time
 
 
 class Simulation:
-    def __init__(self, traces: "list[Trace]", storage: StorageManager, env: Environment, log_file="logs/last_run.txt",
+    def __init__(self, traces: "list[SNIATrace]", storage: StorageManager, env: Environment, log_file="logs/last_run.txt",
                  progress_bar_enabled=True, logs_enabled=True):
         self._env = env
         self._storage = storage
@@ -94,11 +94,18 @@ class Simulation:
             time_taken += tier.create_file(tstart, path, class_size)
             is_read = False
         else:
+            assert file.path in file.tier.content.keys()
             if simulate_perfect_prefetch and file.tier != self._storage.get_default_tier():
+                assert file.tier != self._storage.get_default_tier()
+
                 # First move the file to the efficient tier, then do the access
                 if self._logs_enabled:
                     print(f'Prefetching file from tiers {file.tier.name} to {self._storage.get_default_tier()}')
+
                 self._storage.migrate(file, self._storage.get_default_tier(), self._env.now)
+
+                assert file.path in self._storage.get_default_tier().content.keys()
+
                 file = self._storage.get_default_tier().content[file.path]
             tier = file.tier
             time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)

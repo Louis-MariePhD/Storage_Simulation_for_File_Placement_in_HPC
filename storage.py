@@ -20,6 +20,9 @@ class File:
         self.last_modification = last_mod
         self.last_access = last_access
 
+        assert self.path not in self.tier.content
+        self.tier.content[path] = self
+
 
 class Tier:
     def __init__(self, name: str, max_size: int, latency: float, throughput: float,
@@ -42,6 +45,7 @@ class Tier:
         self.content = dict()  # key: path, value: File
         self.manager = None
         self.listeners = []
+        self.currently_migrating = False
 
         self.number_of_reads = 0
         self.number_of_write = 0
@@ -50,16 +54,20 @@ class Tier:
         self.number_of_prefetching_from_this_tier = 0
         self.number_of_prefetching_to_this_tier = 0
 
-    def register_listener(self, listener : "Policy"):
+        self.time_spent_reading = 0
+        self.time_spent_writing = 0
+
+    def register_listener(self, listener: "Policy"):
         self.listeners += [listener]
 
     def stats(self):
         return {"number_of_reads": self.number_of_reads,
                 "number_of_write": self.number_of_write,
-                "number_of_eviction_from_this_tier": self.number_of_eviction_from_this_tier,
                 "number_of_eviction_to_this_tier": self.number_of_eviction_to_this_tier,
                 "number_of_prefetching_from_this_tier": self.number_of_prefetching_from_this_tier,
-                "number_of_prefetching_to_this_tier": self.number_of_prefetching_to_this_tier}
+                "number_of_prefetching_to_this_tier": self.number_of_prefetching_to_this_tier,
+                "time_spent_reading": self.time_spent_reading,
+                "time_spent_writing": self.time_spent_writing}
 
     def has_file(self, path):
         return path in self.content.keys()
@@ -70,21 +78,35 @@ class Tier:
         """
         return 0
 
-    def create_file(self, timestamp, path, size : int = 0, file : File = None, event_priority=0):
+    def create_file(self, timestamp, path, size: int = 0, file: File = None, migration=False):
         """
+        :param timestamp: timestamp of the file creation event
+        :param path: path of the file being created. No file must exist at this path in this tier
+        :param size: init size of the file. this will not be counted as a write
+        :param file: optional. a file whose metadata will be copied onto the newly created file.
+        :param migration: whether the file creation event was caused by a migration. prevents event loops.
+
         :return: time in seconds until operation completion
         """
-        if file is None :
+        assert path not in self.content.keys()
+
+        if file is None:
             file = File(path, self, size=size, ctime=timestamp, last_mod=timestamp, last_access=timestamp)
         else:
-            # assert file.path not in self.content.keys() # not supposed to happen with our policies
-            file = File(file.path, self, file.size, file.creation_time, file.last_modification, file.last_access)
+            assert file.path == path
+            assert file.path not in self.content.keys()  # not supposed to happen with our policies
+            file = File(path, self, size, file.creation_time, file.last_modification, file.last_access)
+            assert file.path in self.content.keys()
         self.used_size += file.size
-        self.content[path]=file
+        self.time_spent_writing += self.latency + file.size / self.throughput
+        assert path in self.content.keys()
+        assert file.path in self.content.keys()
         for listener in self.listeners:
             listener.on_file_created(file)
-            if self.used_size >= self.max_size*self.target_occupation:
+            if not migration and self.used_size >= self.max_size * self.target_occupation and not self.currently_migrating:
+                self.currently_migrating = True
                 listener.on_tier_nearly_full()
+                self.currently_migrating = False
         return 0
 
     def open_file(self):
@@ -104,6 +126,7 @@ class Tier:
             for listener in self.listeners:
                 listener.on_file_access(file, False)
             self.number_of_reads += 1
+            self.time_spent_reading += self.latency + file.size/self.throughput
             if cause is not None:
                 if cause == "eviction":
                     self.number_of_eviction_from_this_tier += 1
@@ -127,6 +150,7 @@ class Tier:
             for listener in self.listeners:
                 listener.on_file_access(file, True)
             self.number_of_write += 1
+            self.time_spent_writing += self.latency + file.size/self.throughput
             if cause is not None:
                 if cause == "eviction":
                     self.number_of_eviction_to_this_tier += 1
@@ -167,10 +191,6 @@ class StorageManager:
         self._env = env
         self.tiers = tiers
         self.default_tier_index = default_tier_index
-        self.on_file_created_event = [env.event()]
-        self.on_file_deleted_event = [env.event()]
-        self.on_file_access_event = [env.event()]
-        self.on_tier_nearly_full_event = [env.event()]
 
         for tier in tiers:
             tier.manager = self  # association linking
@@ -189,7 +209,9 @@ class StorageManager:
         """
         for tier in self.tiers:
             if tier.has_file(path):
-                return tier.content[path]
+                file = tier.content[path]
+                assert file.path == path
+                return file
         return None
 
     @staticmethod
@@ -198,15 +220,15 @@ class StorageManager:
         :return: The time needed until completion of the migration
         """
 
-        if file.tier is target_tier:
-            return  # Migration has already been done. Nothing to do?
+        if file.path in target_tier.content.keys():
+            return 0
 
         is_eviction = file.tier.manager.tiers.index(file.tier) < file.tier.manager.tiers.index(target_tier)
         cause = ["prefetching", "eviction"][is_eviction]
 
-        # TODO: find migration delay from a paper
         delay = 0.
-        delay += target_tier.create_file(timestamp, file.path, file=file)
+        delay += target_tier.create_file(timestamp, file.path, file=file, migration=True)
+        assert file.path in target_tier.content.keys()
         delay += max(file.tier.read_file(timestamp, file.path, update_meta=False, cause=cause),
                      target_tier.write_file(timestamp, file.path, update_meta=False, cause=cause))
         delay += file.tier.delete_file(file.path, event_priority=2)
