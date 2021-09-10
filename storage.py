@@ -95,9 +95,10 @@ class Tier:
         else:
             assert file.path == path
             assert file.path not in self.content.keys()  # not supposed to happen with our policies
-            file = File(path, self, size, file.creation_time, file.last_modification, file.last_access)
+            file = File(path, self, file.size, file.creation_time, file.last_modification, file.last_access)
             assert file.path in self.content.keys()
         self.used_size += file.size
+        self.time_spent_writing += self.latency # taille du header faible, on considère uniquement la latence.
         assert path in self.content.keys()
         assert file.path in self.content.keys()
         for listener in self.listeners:

@@ -163,8 +163,8 @@ if __name__ == "__main__":
                                                                            + tier.number_of_prefetching_to_this_tier
                                                                            + tier.number_of_eviction_from_this_tier
                                                                            + tier.number_of_eviction_to_this_tier),
-                                              ("Time spent reading", tier.time_spent_reading),
-                                              ("Time spent writing", tier.time_spent_writing)]:
+                                              ("Time spent reading", round(tier.time_spent_reading, 3)),
+                                              ("Time spent writing", round(tier.time_spent_writing, 3))]:
                     line_name = f'{selected_policy} - {tier.name} - {stat_name}'
                     if line_name not in plot_y.keys():
                         plot_y[line_name] = []
