@@ -4,7 +4,7 @@ from typing import List
 
 
 class File:
-    def __init__(self, path: str, tier: "Tier", size: int, ctime: float, last_mod: float, last_access: float):
+    def __init__(self, path: str, tier: "Tier", size: int, ctime: float, last_mod: float, last_access: float, user : str = 'default_user'):
         """
         :param path: full qualified path
         :param tier: host tier
@@ -19,6 +19,7 @@ class File:
         self.creation_time = ctime
         self.last_modification = last_mod
         self.last_access = last_access
+        self.user = user
 
         assert self.path not in self.tier.content
         self.tier.content[path] = self
