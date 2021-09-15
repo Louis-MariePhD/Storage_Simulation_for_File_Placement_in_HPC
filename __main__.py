@@ -18,6 +18,7 @@ from policies.lru_policy import LRUPolicy
 from policies.fifo_policy import FIFOPolicy
 from policies.lifetime_overun_policy import LifetimeOverrunPolicy
 from policies.random_policy import RandomPolicy
+from policies.criteria_based_policy import CriteriaBasedPolicy
 
 from traces.augmented_snia_trace import AugmentedSNIATrace
 from traces.custom_trace import CustomTrace
@@ -26,6 +27,7 @@ from traces.snia_trace import SNIATrace
 available_policies = {"lru": LRUPolicy,
                       "fifo": FIFOPolicy,
                       "lifetime": LifetimeOverrunPolicy,
+                      "criteria": CriteriaBasedPolicy,
                       "random": RandomPolicy}
 available_traces = {"snia": SNIATrace,
                     "augmented-snia": AugmentedSNIATrace,
@@ -140,7 +142,7 @@ if __name__ == "__main__":
                     policy_class = commandline_policy_class
                 elif policy_str in available_policies.keys():
                     policy_class = available_policies[policy_str]
-                if policy_class == LifetimeOverrunPolicy:
+                if policy_class == LifetimeOverrunPolicy or policy_class == CriteriaBasedPolicy:
                     policy_class(tiers[index], storage, env, traces[0].lifetime_per_fileid)
                 else:
                     policy_class(tiers[index], storage, env)
