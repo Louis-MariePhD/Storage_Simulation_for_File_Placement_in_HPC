@@ -208,30 +208,33 @@ if __name__ == "__main__":
                     f'# plot_x\nplot_x = {plot_x}\n\n'
                     f'# plot_y\nplot_y = {plot_y}\n\n'
                     "index = 0\n"
-                    "stats_per_config = 2\n"
-                    "fig1, axs1 = plt.subplots(1, 1)\n"
-                    "fig2, axs2 = plt.subplots(1, 1)\n"
-                    "figs = [fig1, fig2]\n"
-                    "axs = [axs1, axs2]\n"
+                    "stats_per_config = 4\n"
+                    "tmp = [plt.subplots(1, 1) for i in range(stats_per_config)]\n"
+                    "figs = [v[0] for v in tmp]\n"
+                    "axs = [v[1] for v in tmp]\n"
                     "colors = [f'C{i}' for i in range(10)]\n"
-                    "markers = ['+', 'o', 'd', 's', '*']\n"
-                    f'storage_tier_count = {len(tiers)}\n'
-                    "legend = [[], []]\n"
+                    "markers = ['+', 'x', 's', 'o', 'd']\n"
+                    "storage_tier_count = len(tiers)\n"
+                    "legend = [[] for i in range(stats_per_config)]\n"
                     "for line_name in plot_y.keys():\n"
-                    "    legend[index % 2] += axs[index % 2].plot(plot_x, plot_y[line_name],\n"
-                    "                       f'{colors[int(index/(stats_per_config*storage_tier_count))%len(colors)]}'\n"
-                    "                       f'{markers[index%storage_tier_count]}-', label=line_name)\n"
-                    "    index += 1\n"
-                    "axs1.legend(loc=\"upper right\")\n"
-                    "axs2.legend(loc=\"upper right\")\n"
-                    "fig1.tight_layout()\n"
-                    "fig2.tight_layout()\n"
-                    'fig, axs = plt.subplots(1,1)\nplt.subplots_adjust(left=0.3)\n'
-                    'axs.axis("tight")\naxs.axis("off")\naxs.table(cellText=list(plot_y.'
-                    'values()), rowLabels=list(plot_y.keys()), colLabels=plot_x, loc="center")\nfig.tight_layout()\n'
-                    'table.auto_set_font_size(False)\n'
-                    'table.set_fontsize(10)\ntable.scale(1.15, 1.15)\n'
-                    'plt.show()\n')
+                    "    legend[index % stats_per_config] += axs[index % stats_per_config].plot(plot_x, plot_y[line_name],\n"
+                    "      f'{colors[int(index / (stats_per_config * storage_tier_count)) % len(colors)]}'\n"
+                    "      f'{markers[(int(index / stats_per_config) % storage_tier_count) % len(markers)]}-',\n"
+                    "      label=line_name)\n"
+                    "index += 1\n"
+                    "for i in range(len(figs)):\n"
+                    "    axs[i].legend(loc='upper right')\n"
+                    "figs[i].tight_layout()\n\n"
+        
+                    "fig, axs = plt.subplots(1, 1)\n"
+                    "plt.subplots_adjust(left=0.1)\n"
+                    "axs.axis('tight')\n"
+                    "axs.axis('off')\n"
+                    "table = axs.table(cellText=list(plot_y.values()), rowLabels=list(plot_y.keys()), colLabels=plot_x,\n"
+                    "                  loc='center')\n"
+                    "table.auto_set_font_size(False)\n"
+                    "table.set_fontsize(8)\n"
+                    "table.scale(0.8, 0.8)\n")
     except:
         print(f'Error trying to write into a new file in output folder "{output_folder}"')
 
