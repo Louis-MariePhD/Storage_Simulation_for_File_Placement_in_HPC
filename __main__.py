@@ -214,7 +214,7 @@ if __name__ == "__main__":
                     "axs = [v[1] for v in tmp]\n"
                     "colors = [f'C{i}' for i in range(10)]\n"
                     "markers = ['+', 'x', 's', 'o', 'd']\n"
-                    "storage_tier_count = len(tiers)\n"
+                    f'storage_tier_count = {len(tiers)}\n'
                     "legend = [[] for i in range(stats_per_config)]\n"
                     "for line_name in plot_y.keys():\n"
                     "    legend[index % stats_per_config] += axs[index % stats_per_config].plot(plot_x, plot_y[line_name],\n"
