@@ -224,7 +224,7 @@ if __name__ == "__main__":
                     "      f'{colors[int(index / (stats_per_config * storage_tier_count)) % len(colors)]}'\n"
                     "      f'{markers[(int(index / stats_per_config) % storage_tier_count) % len(markers)]}-',\n"
                     "      label=line_name)\n"
-                    "index += 1\n"
+                    "      index += 1\n"
                     "for i in range(len(figs)):\n"
                     "    axs[i].legend(loc='upper right')\n"
                     "figs[i].tight_layout()\n\n"
