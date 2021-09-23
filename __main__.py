@@ -7,6 +7,8 @@ import simpy
 import matplotlib.pyplot as plt
 from math import sqrt
 
+from traces.ibm_object_store_trace import IBMObjectStoreTrace
+
 if sys.version_info[0] < 3:
     raise Exception("Must be using Python 3")
 
@@ -29,9 +31,10 @@ available_policies = {"lru": LRUPolicy,
                       "lifetime": LifetimeOverrunPolicy,
                       "criteria": CriteriaBasedPolicy,
                       "random": RandomPolicy}
-available_traces = {"snia": SNIATrace,
-                    "augmented-snia": AugmentedSNIATrace,
-                    "custom": CustomTrace}
+available_traces = {"snia": SNIATrace(TENCENT_DATASET_FILE_THREAD1),
+                    "augmented-snia": AugmentedSNIATrace(TENCENT_DATASET_FILE_THREAD1),
+                    "custom": CustomTrace(),
+                    "ibm_object_store": IBMObjectStoreTrace()}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -74,8 +77,8 @@ if __name__ == "__main__":
     run_index = 0
     formatted_results = ""
     unit = 10 ** 11
-    number_of_tested_config = 12
-    storage_config_list = [[['SSD', round(4 * unit / (sqrt(2) ** (number_of_tested_config - 1 - i))), 100e-6,
+    number_of_tested_config = 4
+    storage_config_list = [[['SSD', round(4 * unit / (sqrt(2) ** (number_of_tested_config - 1 - i*3))), 100e-6,
                              2e9, 'commandline-policy'],
                             ['HDD', 8 * unit, 10e-3, 250e6, 'commandline-policy'],
                             ['Tapes', 50 * unit, 20, 315e6, 'no-policy']] for i in

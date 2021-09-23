@@ -21,10 +21,10 @@ class CustomTrace:
         'c': (6050183, 0.95),
         'b': (8387821, 1)}
 
-    def __init__(self, trace_path: str, trace_len_limit = -1, average_lifetime=None):
+    def __init__(self, trace_path: str, average_lifetime=None):
         self.data = []
 
-    def get_data(self):
+    def get_data(self, trace_len_limit=-1):
         """
         :return: The trace data as a AoS
         """
