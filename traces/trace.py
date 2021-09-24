@@ -13,6 +13,9 @@ class Trace:
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
                      "offset", "count", "isRead", "segments")
 
+    def __init__(self):
+        pass
+
     def gen_data(self, trace_len_limit=-1):
         """
         :return: The trace data as a AoS

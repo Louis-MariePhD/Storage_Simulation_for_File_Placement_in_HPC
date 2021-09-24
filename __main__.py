@@ -116,7 +116,7 @@ if __name__ == "__main__":
                 elif policy_str in available_policies.keys():
                     policy_class = available_policies[policy_str]
                 if policy_class == LifetimeOverrunPolicy or policy_class == CriteriaBasedPolicy:
-                    policy_class(tiers[index], storage, env, traces[0].lifetime_per_fileid)
+                    policy_class(tiers[index], storage, env, trace.lifetime_per_fileid)
                 else:
                     policy_class(tiers[index], storage, env)
 

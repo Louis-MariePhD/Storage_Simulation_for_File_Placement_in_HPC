@@ -26,7 +26,7 @@ class AugmentedSNIATrace(SNIATrace):
         'b': 8387821}
 
     def __init__(self, trace_path: str):
-        super(self, trace_path)
+        SNIATrace.__init__(self, trace_path)
 
     def gen_data(self, trace_len_limit=-1):
         """

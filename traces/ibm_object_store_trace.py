@@ -4,17 +4,19 @@ import sys
 import datetime
 from tqdm import tqdm
 from resources import IBM_OBJECT_STORE_FILES
+from traces.trace import Trace
 
 _DEBUG = False
 
 
-class IBMObjectStoreTrace:
+class IBMObjectStoreTrace(Trace):
 
     # Column names extracted from recorder_viz, kept here as static members vars
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
                      "offset", "count", "isRead", "segments")
 
     def __init__(self):
+        Trace.__init__(self)
         self.file_ids_occurences = {}
         self.lifetime_per_fileid = {}
 

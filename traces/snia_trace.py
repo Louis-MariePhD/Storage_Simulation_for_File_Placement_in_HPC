@@ -2,9 +2,10 @@
 import os
 import sys
 import datetime
-from trace import Trace
 
 from tqdm import tqdm
+
+from traces.trace import Trace
 
 _DEBUG = False
 
@@ -24,7 +25,7 @@ class SNIATrace(Trace):
         'b': 8387821}
 
     def __init__(self, trace_path: str):
-        super(self)
+        Trace.__init__(self)
         self.data = []
         self.file_ids_occurences = {}
         self.lifetime_per_fileid = {}
