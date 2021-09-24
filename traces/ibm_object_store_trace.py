@@ -24,6 +24,7 @@ class IBMObjectStoreTrace:
         """
         self.data = []
         self.line_count = 0
+        iteration_count = 0
 
         if trace_len_limit>0:
             pbar = tqdm(total=trace_len_limit)
@@ -34,50 +35,65 @@ class IBMObjectStoreTrace:
             with open(path) as f:
                 line = f.readline()
                 while len(line)!=0 and (self.line_count<trace_len_limit or trace_len_limit<=0):
-                    pbar.update([len(line), 1][trace_len_limit>0])
+                    iteration_count += 1
                     split = line.split(' ')
-                    timestamp, op_code, uid = split[:3]
+
+                    timestamp, op_code, uid, size, offset_start, offset_end = (split+[0, 0, 0])[:6]
                     timestamp = int(timestamp)
+                    op_code = op_code.split('.')[1]
+                    size = int(size)
+                    offset_start = int(offset_start)
+                    offset_end = int(offset_end)
+
                     if uid not in self.file_ids_occurences:
+                        if op_code != "PUT":
+                            self.data += [(timestamp, "PUT", uid, size, offset_start, offset_end)]
+                            pbar.update([0, 1][trace_len_limit > 0])
+                            self.line_count += 1
+                            if self.line_count>=trace_len_limit and trace_len_limit>0:
+                                continue
                         self.file_ids_occurences[uid] = [1, timestamp]
-                    else:
-                        self.file_ids_occurences[uid][0]+=1
-                        self.file_ids_occurences[uid]+=[timestamp]
-                    self.data += [(timestamp, op_code, uid)]
+                    self.file_ids_occurences[uid][0]+=1
+                    self.file_ids_occurences[uid]+=[timestamp]
+                    self.data += [(timestamp, op_code, uid, size, offset_start, offset_end)]
+                    pbar.update([len(line), 1][trace_len_limit>0])
                     self.line_count+=1
                     line = f.readline()
             if not trace_len_limit>0:
                 pbar.close()
         if trace_len_limit>0:
             pbar.close()
+        print(f'Done loading trace. {round((self.line_count-iteration_count)/iteration_count*100,2)}% '
+              f'({self.line_count-iteration_count}/{iteration_count}) '
+              'of the parsed lines had references to files not created in this trace.')
 
     def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = False, logs_enabled = True):
         """Read a line, and fire events if necessary"""
 
-        file_id, tstart, class_size, return_size = line
-        path = str(file_id)
+        timestamp, op_code, uid, size, offset_start, offset_end = line
 
-        # Updating the storage. It will create a new file if it's the 1st time we see this path
-        file = storage.get_file(path)
-        if file is None:
-            tier = storage.get_default_tier()
-            tier.create_file(tstart, path, class_size)
-        else:
+        file = storage.get_file(uid)
+        if file is not None: # ignoring files that has no been created
             assert file.path in file.tier.content.keys()
             if simulate_perfect_prefetch and file.tier != storage.get_default_tier():
                 assert file.tier != storage.get_default_tier()
-
                 # First move the file to the efficient tier, then do the access
                 if logs_enabled:
                     print(f'Prefetching file from tiers {file.tier.name} to {storage.get_default_tier()}')
-
                 storage.migrate(file, storage.get_default_tier(), env.now)
-
                 assert file.path in storage.get_default_tier().content.keys()
 
-                file = storage.get_default_tier().content[file.path]
             tier = file.tier
-            time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
+            if op_code == "PUT":
+                tier.create_file(timestamp, uid)
+            elif op_code == "GET":
+                tier.read_file(timestamp, uid)
+            elif op_code == "HEAD":
+                tier.read_file(timestamp, uid)
+            elif op_code == "DELETE":
+                tier.delete_file(timestamp, uid)
+            else:
+                raise RuntimeError(f'Unknown operation code {op_code}')
 
     def get_columns_label(self):
         """
@@ -95,8 +111,8 @@ if __name__ == "__main__":
     print("Reading trace...")
     trace.gen_data(trace_len_limit=-1)
     p = round(np.sum([1 for i in trace.file_ids_occurences.values()
-                      if i[0]>1])/len(trace.file_ids_occurences.values())*100.0, 3)
-    print(f'%reused: {p}%')
+                      if i[-1]-i[1]>10])/len(trace.file_ids_occurences.values())*100.0, 3)
+    print(f'%reused 1 min after creation: {p}%')
 
     lifetimes = sorted([i[-1]-i[1] for i in trace.file_ids_occurences.values()])
     y = [i/len(trace.file_ids_occurences.values()) for i in range(len(trace.file_ids_occurences.values()))]

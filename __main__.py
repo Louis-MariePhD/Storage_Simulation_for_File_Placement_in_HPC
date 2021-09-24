@@ -182,9 +182,9 @@ if __name__ == "__main__":
                     f'# plot_y\nplot_y = {plot_y}\n\n'
                     "index = 0\n"
                     "stats_per_config = 4\n"
-                    "tmp = [plt.subplots(1, 1) for i in range(stats_per_config)]\n"
-                    "figs = [v[0] for v in tmp]\n"
-                    "axs = [v[1] for v in tmp]\n"
+                    "dataset_ibm = [plt.subplots(1, 1) for i in range(stats_per_config)]\n"
+                    "figs = [v[0] for v in dataset_ibm]\n"
+                    "axs = [v[1] for v in dataset_ibm]\n"
                     "colors = [f'C{i}' for i in range(10)]\n"
                     "markers = ['+', 'x', 's', 'o', 'd']\n"
                     f'storage_tier_count = {len(tiers)}\n'
