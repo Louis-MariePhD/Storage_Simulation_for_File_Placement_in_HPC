@@ -5,10 +5,12 @@ from trace import Trace
 
 from tqdm import tqdm
 
+from traces.snia_trace import SNIATrace
+
 _DEBUG = False
 
 
-class AugmentedSNIATrace:
+class AugmentedSNIATrace(SNIATrace):
 
     # Column names extracted from recorder_viz, kept here as static members vars
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
@@ -24,13 +26,9 @@ class AugmentedSNIATrace:
         'b': 8387821}
 
     def __init__(self, trace_path: str):
+        super(self, trace_path)
 
-        self.data = []
-        self.file_ids_occurences = {}
-        self.lifetime_per_fileid = {}
-        self.trace_path = trace_path
-
-    def get_data(self, trace_len_limit=-1):
+    def gen_data(self, trace_len_limit=-1):
         """
         :return: The trace data as a AoS
         """
@@ -79,7 +77,7 @@ class AugmentedSNIATrace:
                     line = f.readline()
             reused_percent = round(len([1 for oc in self.file_ids_occurences.values() if oc[0] > 1])
                                    / float(len(self.file_ids_occurences.values()))*100.,3)
-            print(f'[trace-reader] Done loading trace "{trace_path}", for a total of {len(self.data)} '
+            print(f'[trace-reader] Done loading trace "{self.trace_path}", for a total of {len(self.data)} '
                   f'read/writes operations, on {len(self.file_ids_occurences)} uniques file names. '
                   f'{reused_percent}% of files are reused after their creation.')
 
@@ -94,8 +92,7 @@ class AugmentedSNIATrace:
                 self.lifetime_per_fileid[k] = 0
         return self.data
 
-    @staticmethod
-    def get_columns_label():
+    def get_columns_label(self):
         """
         :return: The columns corresponding to the data
         """

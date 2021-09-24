@@ -18,7 +18,7 @@ class IBMObjectStoreTrace:
         self.file_ids_occurences = {}
         self.lifetime_per_fileid = {}
 
-    def get_data(self, trace_len_limit=-1):
+    def gen_data(self, trace_len_limit=-1):
         """
         :return: The trace data as a AoS
         """
@@ -51,10 +51,35 @@ class IBMObjectStoreTrace:
         if trace_len_limit>0:
             pbar.close()
 
+    def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = False, logs_enabled = True):
+        """Read a line, and fire events if necessary"""
 
+        file_id, tstart, class_size, return_size = line
+        path = str(file_id)
 
-    @staticmethod
-    def get_columns_label():
+        # Updating the storage. It will create a new file if it's the 1st time we see this path
+        file = storage.get_file(path)
+        if file is None:
+            tier = storage.get_default_tier()
+            tier.create_file(tstart, path, class_size)
+        else:
+            assert file.path in file.tier.content.keys()
+            if simulate_perfect_prefetch and file.tier != storage.get_default_tier():
+                assert file.tier != storage.get_default_tier()
+
+                # First move the file to the efficient tier, then do the access
+                if logs_enabled:
+                    print(f'Prefetching file from tiers {file.tier.name} to {storage.get_default_tier()}')
+
+                storage.migrate(file, storage.get_default_tier(), env.now)
+
+                assert file.path in storage.get_default_tier().content.keys()
+
+                file = storage.get_default_tier().content[file.path]
+            tier = file.tier
+            time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
+
+    def get_columns_label(self):
         """
         :return: The columns corresponding to the data
         """
@@ -68,7 +93,7 @@ if __name__ == "__main__":
 
     trace = IBMObjectStoreTrace()
     print("Reading trace...")
-    trace.get_data(trace_len_limit=-1)
+    trace.gen_data(trace_len_limit=-1)
     p = round(np.sum([1 for i in trace.file_ids_occurences.values()
                       if i[0]>1])/len(trace.file_ids_occurences.values())*100.0, 3)
     print(f'%reused: {p}%')

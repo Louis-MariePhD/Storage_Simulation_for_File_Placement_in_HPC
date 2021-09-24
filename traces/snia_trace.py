@@ -9,12 +9,11 @@ from tqdm import tqdm
 _DEBUG = False
 
 
-class SNIATrace:
+class SNIATrace(Trace):
 
     # Column names extracted from recorder_viz, kept here as static members vars
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
                      "offset", "count", "isRead", "segments")
-    _TENCENT_DATASET_COLUMN_NAMES = ("timestamp", "")
 
     _CHAR2SIZE = {
         'l': 33136,
@@ -25,13 +24,13 @@ class SNIATrace:
         'b': 8387821}
 
     def __init__(self, trace_path: str):
-
+        super(self)
         self.data = []
         self.file_ids_occurences = {}
         self.lifetime_per_fileid = {}
         self.trace_path = trace_path
 
-    def get_data(self, trace_len_limit=-1):
+    def gen_data(self, trace_len_limit=-1):
         """
         :return: The trace data as a AoS
         """
@@ -81,8 +80,41 @@ class SNIATrace:
 
         return self.data
 
-    @staticmethod
-    def get_columns_label():
+    def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = False, logs_enabled = True):
+
+        """Read a line, and fire events if necessary"""
+        file_id, tstart, class_size, return_size = line
+        path = str(file_id)
+
+        # yield tstart
+        # Lock resources (if necessary)
+
+        # Updating the storage. It will create a new file if it's the 1st time we see this path
+        file = storage.get_file(path)
+        time_taken = 0.  # Time taken by this io, computed by the tier class
+        is_read = True
+        if file is None:
+            tier = storage.get_default_tier()
+            time_taken += tier.create_file(tstart, path, class_size)
+            is_read = False
+        else:
+            assert file.path in file.tier.content.keys()
+            if simulate_perfect_prefetch and file.tier != storage.get_default_tier():
+                assert file.tier != storage.get_default_tier()
+
+                # First move the file to the efficient tier, then do the access
+                if logs_enabled:
+                    print(f'Prefetching file from tiers {file.tier.name} to {storage.get_default_tier()}')
+
+                storage.migrate(file, storage.get_default_tier(), env.now)
+
+                assert file.path in storage.get_default_tier().content.keys()
+
+                file = storage.get_default_tier().content[file.path]
+            tier = file.tier
+            time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
+
+    def get_columns_label(self):
         """
         :return: The columns corresponding to the data
         """

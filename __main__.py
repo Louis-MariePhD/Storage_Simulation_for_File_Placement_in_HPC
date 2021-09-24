@@ -14,7 +14,7 @@ if sys.version_info[0] < 3:
 
 from simulation import Simulation
 from storage import Tier, StorageManager
-from resources import TENCENT_DATASET_FILE_THREAD1
+from resources import TENCENT_DATASET_FILE_THREAD1, PATH
 
 from policies.lru_policy import LRUPolicy
 from policies.fifo_policy import FIFOPolicy
@@ -33,7 +33,7 @@ available_policies = {"lru": LRUPolicy,
                       "random": RandomPolicy}
 available_traces = {"snia": SNIATrace(TENCENT_DATASET_FILE_THREAD1),
                     "augmented-snia": AugmentedSNIATrace(TENCENT_DATASET_FILE_THREAD1),
-                    "custom": CustomTrace(),
+                    "custom": CustomTrace(None),
                     "ibm_object_store": IBMObjectStoreTrace()}
 
 if __name__ == "__main__":
@@ -57,17 +57,19 @@ if __name__ == "__main__":
     args = vars(parser.parse_args())
     verbose, no_ui, custom_trace, no_progress_bar, limit_trace_len, output_folder, config_file, policies = args.values()
 
-    trace_class = available_traces[custom_trace]
+    trace = available_traces[custom_trace]
+    trace.gen_data(trace_len_limit=limit_trace_len)
     if "all" in policies:
         policies = list(available_policies.keys())
         args["policies"] = policies
 
-    print(f'Starting program with parameters {str(args)[1:-1]}')  # If you got an error here, you are using python 2.
+    print(f'Starting program with parameters {str(args)[1:-1]}')
 
     # Write commandline parameters to logs
+    output_folder = output_folder.replace('/',os.path.sep).replace("<timestamp>",
+                                          time.strftime("%a_%d_%b_%Y_%H:%M:%S", time.localtime()))
+    output_folder = os.path.join(os.path.dirname(__file__), output_folder)
     try:
-        output_folder = output_folder.replace("<timestamp>",
-                                              time.strftime("%a_%d_%b_%Y_%H:%M:%S", time.localtime()))
         os.makedirs(output_folder, exist_ok=True)
         with open(os.path.join(output_folder, "commandline_parameters.txt"), "w") as f:
             f.writelines(str(args)[1:-1].replace(", ", "\n"))
@@ -87,44 +89,12 @@ if __name__ == "__main__":
     plot_x = []  # storage config str
     plot_y = {}  # policy + stat -> value
 
-    path = TENCENT_DATASET_FILE_THREAD1
-    if limit_trace_len != -1:
-        path += f'_l{limit_trace_len}'
-    if custom_trace:
-        path += "_augmented"
-    path += '.pickle'
-
     for storage_config in storage_config_list:
         plot_x += [f'{storage_config[0][0]} {round(storage_config[0][1] / (10 ** 9), 3)} Go']
         for selected_policy in policies:
 
             # Init simpy env
             env = simpy.Environment()
-
-            # Load trace
-            traces = None
-            if os.path.exists(path):
-                try:
-                    with open(path, 'rb') as f:
-                        t0 = time.time()
-                        print('Loading trace with pickle...', end=' ', flush=True)
-                        traces = [pickle.load(f)]
-                        print(f'Done after {round((time.time() - t0) * 1000)} ms!')
-                except:
-                    print("Unable to unpickle file! Deleting pickle file and falling back to slower trace loading.")
-                    os.remove(path)
-
-            if traces is None:
-                print('Loading trace from file, please wait...')
-                t0 = time.time()
-                traces = [trace_class(TENCENT_DATASET_FILE_THREAD1, trace_len_limit=limit_trace_len)]
-                print(f'Done loading file from file after {round((time.time() - t0) * 1000)} ms!')
-
-                print('Saving to pickle for faster trace load next time...', end=' ', flush=True)
-                t0 = time.time()
-                with open(path, 'wb') as f:
-                    pickle.dump(traces[0], f)
-                print(f'Done after {round((time.time() - t0) * 1000)} ms!')
 
             # Tiers
             tiers = [Tier(*config[:-1]) for config in storage_config]
@@ -152,7 +122,7 @@ if __name__ == "__main__":
 
                 index += 1
 
-            sim = Simulation(traces, storage, env, log_file=os.path.join(output_folder, "latest.log"),
+            sim = Simulation([trace], storage, env, log_file=os.path.join(output_folder, "latest.log"),
                              progress_bar_enabled=not no_progress_bar,
                              logs_enabled=verbose)
             print(f'Starting simulation for policy {selected_policy} and storage config {storage_config}!')

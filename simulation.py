@@ -68,7 +68,7 @@ class Simulation:
             tstart = line[1]
             yield self._env.timeout(max(0, tstart - last_ts))  # traces are sorted by tstart order.
             last_ts = tstart
-            self._read_line(line, simulate_perfect_prefetch)
+            trace.read_data_line(self._env, self._storage, line, simulate_perfect_prefetch, self._logs_enabled)
 
         if self._progress_bar_enabled:
             pbar.close()
@@ -76,39 +76,6 @@ class Simulation:
         sys.stdout = backup_stdout
         log_stream.close()
         print(f'Done simulating! sys.stdout was restored. Check the log file if enabled for more details on the simulation.')
-
-    def _read_line(self, line, simulate_perfect_prefetch: bool = False):
-        """Read a line, and fire events if necessary"""
-        file_id, tstart, class_size, return_size = line
-        path = str(file_id)
-
-        # yield tstart
-        # Lock resources (if necessary)
-
-        # Updating the storage. It will create a new file if it's the 1st time we see this path
-        file = self._storage.get_file(path)
-        time_taken = 0.  # Time taken by this io, computed by the tier class
-        is_read = True
-        if file is None:
-            tier = self._storage.get_default_tier()
-            time_taken += tier.create_file(tstart, path, class_size)
-            is_read = False
-        else:
-            assert file.path in file.tier.content.keys()
-            if simulate_perfect_prefetch and file.tier != self._storage.get_default_tier():
-                assert file.tier != self._storage.get_default_tier()
-
-                # First move the file to the efficient tier, then do the access
-                if self._logs_enabled:
-                    print(f'Prefetching file from tiers {file.tier.name} to {self._storage.get_default_tier()}')
-
-                self._storage.migrate(file, self._storage.get_default_tier(), self._env.now)
-
-                assert file.path in self._storage.get_default_tier().content.keys()
-
-                file = self._storage.get_default_tier().content[file.path]
-            tier = file.tier
-            time_taken += [tier.write_file, tier.read_file][is_read](tstart, path)
 
         # yield tend
         # Unlock resources (not necessary either?)
