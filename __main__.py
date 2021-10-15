@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     # Write commandline parameters to logs
     output_folder = output_folder.replace('/',os.path.sep).replace("<timestamp>",
-                                          time.strftime("%a_%d_%b_%Y_%H:%M:%S", time.localtime()))
-    output_folder = os.path.join(os.path.dirname(__file__), output_folder)
+                                          time.strftime("%a_%d_%b_%Y_%H-%M-%S", time.localtime()))
+    output_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), output_folder))
     try:
         os.makedirs(output_folder, exist_ok=True)
         with open(os.path.join(output_folder, "commandline_parameters.txt"), "w") as f:

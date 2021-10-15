@@ -66,7 +66,7 @@ class Simulation:
                 pbar.update(1)
             # tstart = line[2]
             # tstart = line[1]
-            tstart = line[0] # trace-specific, FIXME
+            tstart = trace.timestamp_from_line(line)
             yield self._env.timeout(max(0, tstart - last_ts))  # traces are sorted by tstart order.
             last_ts = tstart
             trace.read_data_line(self._env, self._storage, line, simulate_perfect_prefetch, self._logs_enabled)

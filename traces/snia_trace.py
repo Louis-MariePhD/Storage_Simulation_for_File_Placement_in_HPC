@@ -120,3 +120,6 @@ class SNIATrace(Trace):
         :return: The columns corresponding to the data
         """
         return Trace._COLUMN_NAMES
+
+    def timestamp_from_line(self, line):
+        return line[1]

@@ -20,7 +20,7 @@ class IBMObjectStoreTrace(Trace):
         self.file_ids_occurences = {}
         self.lifetime_per_fileid = {}
 
-    def gen_data(self, trace_len_limit=-1):
+    def gen_data(self, trace_len_limit=-1, ignore_head=False):
         """
         :return: The trace data as a AoS
         """
@@ -46,6 +46,11 @@ class IBMObjectStoreTrace(Trace):
                     size = int(size)
                     offset_start = int(offset_start)
                     offset_end = int(offset_end)
+
+                    if ignore_head and op_code == "HEAD":
+                        pbar.update([len(line), 1][trace_len_limit>0])
+                        line = f.readline()
+                        continue
 
                     if uid not in self.file_ids_occurences:
                         if op_code != "PUT":
@@ -84,24 +89,41 @@ class IBMObjectStoreTrace(Trace):
                     print(f'Prefetching file from tiers {file.tier.name} to {storage.get_default_tier()}')
                 storage.migrate(file, storage.get_default_tier(), env.now)
                 assert file.path in storage.get_default_tier().content.keys()
-
             tier = file.tier
-            if op_code == "PUT":
-                tier.create_file(timestamp, uid)
-            elif op_code == "GET":
+        else:
+            tier = storage.get_default_tier()
+
+        if file is not None:
+            if op_code == "GET":
                 tier.read_file(timestamp, uid)
             elif op_code == "HEAD":
                 tier.read_file(timestamp, uid)
             elif op_code == "DELETE":
                 tier.delete_file(timestamp, uid)
+            elif op_code == "COPY":
+                print(f'Skipping undefined operation "{(" ".join([str(i) for i in line]))}".')
+            elif op_code == "PUT":
+                print(f'Invalid use of operation code {op_code} in operation "{(" ".join([str(i) for i in line]))}" '
+                      '- file already exist.')
             else:
                 raise RuntimeError(f'Unknown operation code {op_code}')
+        else:
+            if op_code == "PUT":
+                tier.create_file(timestamp, uid)
+            elif op_code in ["GET", "HEAD", "DELETE"]:
+                raise RuntimeError(f'Invalid use of operation code {op_code} - file does not exist')
+            else:
+                raise RuntimeError(f'Unknown operation code {op_code}')
+
 
     def get_columns_label(self):
         """
         :return: The columns corresponding to the data
         """
         return IBMObjectStoreTrace._COLUMN_NAMES
+
+    def timestamp_from_line(self, line):
+        return line[0]
 
 
 if __name__ == "__main__":
@@ -112,6 +134,13 @@ if __name__ == "__main__":
     trace = IBMObjectStoreTrace()
     print("Reading trace...")
     trace.gen_data(trace_len_limit=-1)
+    p = round(np.sum([1 for i in trace.file_ids_occurences.values()
+                      if i[-1]-i[1]>10])/len(trace.file_ids_occurences.values())*100.0, 3)
+    print(f'%reused 1 min after creation: {p}%')
+
+    trace = IBMObjectStoreTrace()
+    print("Now doing the same, but ignoring HEAD commands. Reading trace...")
+    trace.gen_data(trace_len_limit=-1,ignore_head=True)
     p = round(np.sum([1 for i in trace.file_ids_occurences.values()
                       if i[-1]-i[1]>10])/len(trace.file_ids_occurences.values())*100.0, 3)
     print(f'%reused 1 min after creation: {p}%')

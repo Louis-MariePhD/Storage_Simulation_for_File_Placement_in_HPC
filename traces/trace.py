@@ -25,6 +25,9 @@ class Trace:
     def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = False, logs_enabled = True):
         raise NotImplementedError("Using unspecialized trace class.")
 
+    def timestamp_from_line(self, line):
+        raise NotImplementedError("Using unspecialized trace class.")
+
     def get_columns_label(self):
         """
         :return: The columns corresponding to the data
