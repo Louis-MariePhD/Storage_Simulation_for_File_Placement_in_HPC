@@ -14,4 +14,4 @@ Then, you must add it to the command line options by adding it to the "available
 
 At last, you must either create your own trace parcer class (and add it to the "available_traces" dictionnary in \_\_main\_\_.py), or download from SNIA IOTTA website the missing trace files in the "resources" directory and use the trace parser we already implemented.
 
-When everything is done, run ```python \_\_main\_\_.py --help``` to start interacting with the simulator.
+When everything is done, run ```python __main__.py --help``` to start interacting with the simulator.
