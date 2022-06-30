@@ -9,10 +9,6 @@ _DEBUG = False
 
 class Trace:
 
-    # Column names extracted from recorder_viz, kept here as static members vars
-    _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
-                     "offset", "count", "isRead", "segments")
-
     def __init__(self):
         pass
 

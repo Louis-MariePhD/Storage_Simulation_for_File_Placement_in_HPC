@@ -18,7 +18,7 @@ class Simulation:
 
         # Adding traces to env as processes
         for trace in traces:
-            self._env.process(self._read_trace(trace, True))
+            self._env.process(self._read_trace(trace))
 
     def run(self):
         """Start the simpy simulation loop. At the end of the simulation, prints the results"""
@@ -34,6 +34,7 @@ class Simulation:
             tier.number_of_prefetching_from_this_tier+tier.number_of_prefetching_to_this_tier
             output += (f'Tier "{tier.name}":'
                   f'{s}Size {tier.max_size / (10 ** 9)} Go ({tier_occupation} octets)'
+                  f'{s}Used space {tier.used_size / (10 ** 9)} Go'
                   f'{s}{total_migration_count} migrations'
                   f'{s2}{tier.number_of_prefetching_to_this_tier} due to prefetching to this tiers'
                   f'{s2}{tier.number_of_prefetching_from_this_tier} due to prefetching from this tiers'

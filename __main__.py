@@ -2,11 +2,12 @@ import sys
 import argparse
 import os
 import time
-import pickle
+import random
 import simpy
 import matplotlib.pyplot as plt
-from math import sqrt
+from math import sqrt, log10
 
+from traces.augmented_ibm_object_store_trace import AugmentedIBMObjectStoreTrace
 from traces.ibm_object_store_trace import IBMObjectStoreTrace
 
 if sys.version_info[0] < 3:
@@ -23,7 +24,6 @@ from policies.random_policy import RandomPolicy
 from policies.criteria_based_policy import CriteriaBasedPolicy
 
 from traces.augmented_snia_trace import AugmentedSNIATrace
-from traces.custom_trace import CustomTrace
 from traces.snia_trace import SNIATrace
 
 available_policies = {"lru": LRUPolicy,
@@ -33,7 +33,7 @@ available_policies = {"lru": LRUPolicy,
                       "random": RandomPolicy}
 available_traces = {"snia": SNIATrace(TENCENT_DATASET_FILE_THREAD1),
                     "augmented-snia": AugmentedSNIATrace(TENCENT_DATASET_FILE_THREAD1),
-                    "custom": CustomTrace(None),
+                    "augmented-ibm": AugmentedIBMObjectStoreTrace(),
                     "ibm_object_store": IBMObjectStoreTrace()}
 
 if __name__ == "__main__":
@@ -52,13 +52,32 @@ if __name__ == "__main__":
                                                     "doesn't exist at the given path, a new one will be created and "
                                                     "simulation will exit.",
                         default=os.path.join(os.path.dirname(__file__), "config.cfg"))
+    parser.add_argument("-i", "--noise-intensity", help="The noise amount for lifetimes. values given to the policies"
+                        " are subjects to the following function: "
+                        "noise_range = [10**(log10(exact_value) + i*noise_intensity) "
+                        "for i in [-1, 1]]; return random(*noise_range). "
+                        "random(a, b) randomly picking a float such as a<=random(a,b)<=b."
+                        "A noise intensity of 0.0 means exact values while a noise intensity of "
+                        "1.0 means values randomly picked within a magnitude of the exact value.",
+                        default=float(0.0), type=float)
     parser.add_argument("policies", nargs='+', choices=["all"] + list(available_policies.keys()))
 
     args = vars(parser.parse_args())
-    verbose, no_ui, custom_trace, no_progress_bar, limit_trace_len, output_folder, config_file, policies = args.values()
+    verbose, no_ui, custom_trace, no_progress_bar, limit_trace_len, output_folder, config_file, noise_intensity,\
+        policies = args.values()
 
     trace = available_traces[custom_trace]
     trace.gen_data(trace_len_limit=limit_trace_len)
+
+    if float(noise_intensity)>0:
+        def noisy_value(exact_value, noise_intensity):
+            #print(exact_value)
+            noise_range = [10 ** (log10(max(1, exact_value)) + i * noise_intensity) if i > 0 else 0 for i in [-1, 1]]
+            return noise_range[0] + random.random()*(noise_range[1]-noise_range[0])
+
+        trace.lifetime_per_fileid = {id: noisy_value(exact_value, float(noise_intensity))
+                                     for id, exact_value in trace.lifetime_per_fileid.items()}
+
     if "all" in policies:
         policies = list(available_policies.keys())
         args["policies"] = policies
@@ -78,13 +97,18 @@ if __name__ == "__main__":
 
     run_index = 0
     formatted_results = ""
-    unit = 10 ** 11
+    unit = 10 ** 9
     number_of_tested_config = 4
-    storage_config_list = [[['SSD', round(4 * unit / (sqrt(2) ** (number_of_tested_config - 1 - i*3))), 100e-6,
+    storage_config_list = [[['SSD', round(40 * unit / (4 ** i)), 100e-6,
                              2e9, 'commandline-policy'],
                             ['HDD', 8 * unit, 10e-3, 250e6, 'commandline-policy'],
                             ['Tapes', 50 * unit, 20, 315e6, 'no-policy']] for i in
                            range(number_of_tested_config)]
+
+    storage_config_list = [[['SSD', round(0.03125 * unit), 100e-6,
+                             2e9, 'commandline-policy'],
+                            ['HDD', 8 * unit, 10e-3, 250e6, 'commandline-policy'],
+                            ['Tapes', 50 * unit, 20, 315e6, 'no-policy']]]
 
     plot_x = []  # storage config str
     plot_y = {}  # policy + stat -> value
@@ -125,7 +149,8 @@ if __name__ == "__main__":
             sim = Simulation([trace], storage, env, log_file=os.path.join(output_folder, "latest.log"),
                              progress_bar_enabled=not no_progress_bar,
                              logs_enabled=verbose)
-            print(f'Starting simulation for policy {selected_policy} and storage config {storage_config}!')
+            print(f'Starting simulation for policy {selected_policy}, storage config {storage_config} and noise '
+                  f'intensity {noise_intensity}!')
             last_results = sim.run()
             last_results = f'{"#" * 10} Run N°{run_index} {"#" * 10}\n{last_results}\n'
             run_index += 1
@@ -194,7 +219,7 @@ if __name__ == "__main__":
                     "      f'{colors[int(index / (stats_per_config * storage_tier_count)) % len(colors)]}'\n"
                     "      f'{markers[(int(index / stats_per_config) % storage_tier_count) % len(markers)]}-',\n"
                     "      label=line_name)\n"
-                    "      index += 1\n"
+                    "    index += 1\n"
                     "for i in range(len(figs)):\n"
                     "    axs[i].legend(loc='upper right')\n"
                     "figs[i].tight_layout()\n\n"
@@ -207,7 +232,7 @@ if __name__ == "__main__":
                     "                  loc='center')\n"
                     "table.auto_set_font_size(False)\n"
                     "table.set_fontsize(8)\n"
-                    "table.scale(0.8, 0.8)\n")
+                    "table.scale(0.8, 0.8)\nplt.show()\n")
     except:
         print(f'Error trying to write into a new file in output folder "{output_folder}"')
 

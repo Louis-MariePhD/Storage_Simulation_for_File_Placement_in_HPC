@@ -25,7 +25,9 @@ class RandomPolicy(Policy):
         if target_tier_id < len(self.storage.tiers): # checking this next tier do exist
             while self.tier.used_size > self.tier.max_size * (self.tier.target_occupation - 0.15):
                 choice = random.choice(self.rand_list)
-                if choice in self.tier.content:
+                self.rand_list.remove(choice)
+                if choice in self.tier.content.keys():
+                    # TODO: FIX ME
                     self.storage.migrate(self.tier.content[random.choice(self.rand_list)], self.storage.tiers[target_tier_id], self.env.now) # migrating
         else:
             print(f'Tier {self.tier.name} is nearly full, but there is no other tier to discharge load.')

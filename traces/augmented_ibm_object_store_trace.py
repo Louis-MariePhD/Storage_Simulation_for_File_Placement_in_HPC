@@ -1,7 +1,7 @@
 #import recorder_viz
 import os
 import sys
-import datetime
+import random
 from tqdm import tqdm
 from resources import IBM_OBJECT_STORE_FILES
 from traces.trace import Trace
@@ -9,7 +9,7 @@ from traces.trace import Trace
 _DEBUG = False
 
 
-class IBMObjectStoreTrace(Trace):
+class AugmentedIBMObjectStoreTrace(Trace):
 
     # Column names extracted from recorder_viz, kept here as static members vars
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
@@ -87,10 +87,26 @@ class IBMObjectStoreTrace(Trace):
                             self.file_ids_occurences[uid] = [0, timestamp, timestamp]
 
                     self.file_ids_occurences[uid][0] += 1
-                    self.file_ids_occurences[uid][2]=timestamp
+                    self.file_ids_occurences[uid][2] = max(self.file_ids_occurences[uid][2], timestamp)
                     self.data += [(timestamp, op_code, uid, size, offset_start, offset_end)]
                     pbar.update([len(line), 1][trace_len_limit>0])
                     self.line_count+=1
+
+                    if self.line_count>1000:
+                        while random.random() > 0.2:
+                            # old_entry = self.data[max(0, len(self.data)-10000):][random.randint(0, min(10000, len(self.data))-1)]
+                            old_entry = self.data[random.randint(0, len(self.data)-1)]
+                            new_entry = [v for v in old_entry]
+                            new_entry[0] = timestamp
+                            self.data += [new_entry]
+                            self.file_ids_occurences[new_entry[2]][0] += 1
+                            self.file_ids_occurences[new_entry[2]][2] = max(self.file_ids_occurences[new_entry[2]][2],
+                                                                            timestamp)
+
+                            self.line_count += 1
+                            if 0 < trace_len_limit <= self.line_count:
+                                break
+                                # python __main__.py -t augmented-ibm -l 10000 -i 0.0 lru fifo lifetime && python __main__.py -t augmented-ibm -i 0.5 lifetime -l 10000
 
             if not trace_len_limit>0:
                 pbar.close()
@@ -119,8 +135,9 @@ class IBMObjectStoreTrace(Trace):
         #      f'({self.line_count-iteration_count}/{iteration_count}) '
         #      'of the parsed lines had references to files not created in this trace.')
 
-    def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = True, logs_enabled = True):
+    def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = False, logs_enabled = True):
         """Read a line, and fire events if necessary"""
+
         timestamp, op_code, uid, size, offset_start, offset_end = line
 
         file = storage.get_file(uid)
@@ -166,7 +183,7 @@ class IBMObjectStoreTrace(Trace):
         """
         :return: The columns corresponding to the data
         """
-        return IBMObjectStoreTrace._COLUMN_NAMES
+        return AugmentedIBMObjectStoreTrace._COLUMN_NAMES
 
     def timestamp_from_line(self, line):
         return line[0]

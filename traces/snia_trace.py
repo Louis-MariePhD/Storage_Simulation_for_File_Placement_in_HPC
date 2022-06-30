@@ -11,6 +11,9 @@ _DEBUG = False
 
 
 class SNIATrace(Trace):
+    """
+    Tencent Trace
+    """
 
     # Column names extracted from recorder_viz, kept here as static members vars
     _COLUMN_NAMES = ("path", "rank", "tstart", "tend",
@@ -81,7 +84,7 @@ class SNIATrace(Trace):
 
         return self.data
 
-    def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = False, logs_enabled = True):
+    def read_data_line(self, env, storage, line, simulate_perfect_prefetch: bool = True, logs_enabled = True):
 
         """Read a line, and fire events if necessary"""
         file_id, tstart, class_size, return_size = line
